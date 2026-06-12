@@ -1,0 +1,221 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* ============================================================
+   IAS OS — Premium Glass Design System
+   Deep obsidian base · translucent frosted surfaces · refraction
+   edge highlights · restrained single-accent palette.
+   ============================================================ */
+
+@theme {
+  /* ---- Base surfaces (deep obsidian, blue-tinted neutrals) ---- */
+  --color-background: #08090b;
+  --color-obsidian-deep: #08090b;
+  --color-surface: #0c0e11;
+  --color-surface-dim: #0a0c0f;
+  --color-surface-bright: #1a1d23;
+  --color-surface-variant: #1c2027;
+  --color-surface-elevated: #161a20;
+  --color-surface-container-lowest: #07080a;
+  --color-surface-container-low: #0e1014;
+  --color-surface-container: #12151a;
+  --color-surface-container-high: #171b21;
+  --color-surface-container-highest: #1d222a;
+
+  /* ---- Text (WCAG AA+ on all surfaces above) ---- */
+  --color-on-surface: #f2f4f6;
+  --color-on-surface-variant: #aab3bf;
+
+  /* ---- Refraction borders (white-alpha, light-catching) ---- */
+  --color-cyber-border: rgba(255, 255, 255, 0.07);
+  --color-cyber-border-highlight: rgba(255, 255, 255, 0.14);
+  --color-surface-border: rgba(255, 255, 255, 0.08);
+  --color-surface-border-hover: rgba(255, 255, 255, 0.18);
+
+  /* ---- Accent: refined lime (single accent, used sparingly) ---- */
+  --color-primary: #a3e635;
+  --color-primary-container: #3f6212;
+  --color-on-primary-fixed: #0f1a02;
+  --color-agent-active-glow: #bef264;
+  --color-surface-tint: #a3e635;
+
+  /* ---- Supporting hues (cool, desaturated) ---- */
+  --color-secondary: #7dd3fc;
+  --color-secondary-fixed: #bae6fd;
+  --color-telemetry-blue: #7cc0ff;
+  --color-strategic-violet: #8b8cf8;
+
+  /* ---- Status ---- */
+  --color-error: #f87171;
+  --color-warning: #fbbf24;
+
+  --font-sans: var(--font-sans), sans-serif;
+  --font-mono: var(--font-mono), monospace;
+}
+
+:root {
+  /* RGB triplets for alpha-composed shadows in utility classes */
+  --primary-rgb: 163, 230, 53;
+  --error-rgb: 248, 113, 113;
+  --warning-rgb: 251, 191, 36;
+}
+
+body {
+  background-color: var(--color-obsidian-deep);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 20% -10%, rgba(163, 230, 53, 0.04), transparent 60%),
+    radial-gradient(ellipse 60% 40% at 90% 110%, rgba(124, 192, 255, 0.04), transparent 60%);
+  color: var(--color-on-surface);
+  font-family: var(--font-sans);
+}
+
+/* ============================================================
+   Scrollbars
+   ============================================================ */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* ============================================================
+   Glass surfaces
+   Layered: translucent fill · blur+saturate · top refraction
+   line · soft ambient depth shadow.
+   ============================================================ */
+.glass-panel {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0.012) 100%),
+    rgba(12, 14, 17, 0.55);
+  backdrop-filter: blur(22px) saturate(140%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  border: 1px solid var(--color-cyber-border);
+  box-shadow:
+    0 12px 32px -8px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.07);
+}
+
+.glass-elevated,
+.glass-dropdown {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%),
+    rgba(18, 21, 26, 0.7);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  border: 1px solid var(--color-cyber-border-highlight);
+  box-shadow:
+    0 20px 48px -12px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+}
+
+.glass-nav {
+  background: rgba(8, 9, 11, 0.62);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border-bottom: 1px solid var(--color-cyber-border);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
+}
+
+/* ============================================================
+   Interaction states
+   ============================================================ */
+.hover-lift {
+  transition:
+    transform 180ms cubic-bezier(0.2, 0, 0, 1),
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease;
+}
+.hover-lift:hover {
+  transform: translateY(-2px);
+  border-color: var(--color-surface-border-hover);
+  box-shadow:
+    0 16px 40px -8px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.04),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+}
+
+.pulse-active {
+  box-shadow:
+    0 0 0 1px rgba(var(--primary-rgb), 0.35),
+    0 0 24px -4px rgba(var(--primary-rgb), 0.18),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.07);
+  border-color: rgba(var(--primary-rgb), 0.4);
+}
+
+.pulse-border {
+  border-color: rgba(var(--primary-rgb), 0.25);
+  box-shadow: 0 0 20px -6px rgba(var(--primary-rgb), 0.15);
+}
+
+/* Keyboard focus: visible, accent-tinted, never removed */
+:focus-visible {
+  outline: 2px solid rgba(var(--primary-rgb), 0.65);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+input:focus-visible,
+textarea:focus-visible {
+  outline-offset: 0;
+}
+
+/* ============================================================
+   Ambient effects
+   ============================================================ */
+.terminal-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+.data-stream::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(var(--primary-rgb), 0.4), transparent);
+  animation: scanline 5s linear infinite;
+  z-index: 10;
+  pointer-events: none;
+}
+
+@keyframes dash {
+  to { stroke-dashoffset: -30; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fade-in 220ms ease both;
+}
+
+/* ============================================================
+   Reduced motion: collapse decorative animation, keep function
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .hover-lift:hover {
+    transform: none;
+  }
+}

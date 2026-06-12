@@ -1,0 +1,6 @@
+{
+  "name": "Imam Agent Studio",
+  "description": "Visual AI Operating System (AIOS) featuring a multi-agent workforce, memory graphs, and an autonomous execution layer.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
