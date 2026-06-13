@@ -23,8 +23,9 @@ export function TopNav({ title, tabs, activeTab }: TopNavProps) {
                 className={`pb-1 border-b-2 font-mono tracking-tight ${
                   tab === activeTab
                     ? 'text-primary border-primary'
-                    : 'text-on-surface-variant/60 border-transparent'
+                    : 'text-on-surface-variant/60 border-transparent cursor-not-allowed opacity-50'
                 }`}
+                title={tab !== activeTab ? "Coming Soon" : undefined}
               >
                 {tab}
               </span>
