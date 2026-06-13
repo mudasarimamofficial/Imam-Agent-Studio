@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { routeAI } from '../ai/router';
-import { getUserSettings } from '../settings';
+import { getUserSettings, getUserSecrets } from '../settings';
 import { fetchWithRetry, assertSafeUrl } from '../net';
 import { executeTool } from '../tools';
 import { WorkflowInstance, WorkflowNode, ApiResponse, AdminConfig } from '../types';
@@ -32,6 +32,7 @@ export async function executeWorkflow(
 
   const nodes = created.nodes;
   const settings = await getUserSettings(supabase);
+  const secrets = await getUserSecrets(supabase);
 
   for (let i = 0; i < nodes.length; i++) {
     const node = nodes[i];
@@ -43,7 +44,7 @@ export async function executeWorkflow(
       previousNode && previousNode.status === "completed" ? previousNode.output : "";
 
     try {
-      node.output = await executeNode(supabase, userId, settings, node, upstreamOutput);
+      node.output = await executeNode(supabase, userId, settings, secrets, node, upstreamOutput);
       node.status = "completed";
     } catch (error: unknown) {
       // Graceful halt: mark this node + workflow failed, persist the stack,
@@ -93,6 +94,7 @@ async function executeNode(
   supabase: SupabaseClient,
   userId: string,
   settings: AdminConfig,
+  secrets: { gemini: string | null; nvidia: string | null; places: string | null },
   node: WorkflowNode,
   upstreamOutput: string
 ): Promise<string> {
@@ -108,7 +110,8 @@ async function executeNode(
               : node.input,
           }]
         },
-        { gemini: settings.routing_weight_gemini, nvidia: settings.routing_weight_nvidia }
+        { gemini: settings.routing_weight_gemini, nvidia: settings.routing_weight_nvidia },
+        { gemini: secrets.gemini, nvidia: secrets.nvidia }
       );
 
       await supabase.from("inference_events").insert({

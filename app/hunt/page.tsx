@@ -7,16 +7,72 @@ import {
   MapPin,
   Globe,
   Database,
-  Search
+  Search,
+  X,
+  Sparkles,
+  Loader2,
+  Copy,
+  Check,
+  Star,
+  Users
 } from 'lucide-react';
 import { HuntResult } from '@/lib/types';
 import type { SystemStats } from '@/app/api/stats/route';
+
+function scoreColor(score: number): string {
+  if (score >= 70) return 'text-primary';
+  if (score >= 45) return 'text-warning';
+  return 'text-on-surface-variant';
+}
 
 export default function HuntPage() {
   const [query, setQuery] = useState("Software companies in Karachi");
   const [results, setResults] = useState<HuntResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [huntStats, setHuntStats] = useState<SystemStats['hunt'] | null>(null);
+
+  // Lead detail / outreach panel
+  const [selected, setSelected] = useState<HuntResult | null>(null);
+  const [pitch, setPitch] = useState<string | null>(null);
+  const [pitchLoading, setPitchLoading] = useState(false);
+  const [pitchError, setPitchError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const openLead = (lead: HuntResult) => {
+    setSelected(lead);
+    setPitch(null);
+    setPitchError(null);
+    setCopied(false);
+  };
+
+  const generatePitch = async () => {
+    if (!selected || pitchLoading) return;
+    setPitchLoading(true);
+    setPitchError(null);
+    try {
+      const res = await fetch('/api/hunt/pitch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(selected),
+      });
+      const json = await res.json();
+      if (json.success) setPitch(json.data.pitch);
+      else setPitchError(json.error?.message || 'Failed to generate pitch');
+    } catch {
+      setPitchError('Network error generating pitch');
+    } finally {
+      setPitchLoading(false);
+    }
+  };
+
+  const copyPitch = async () => {
+    if (!pitch) return;
+    try {
+      await navigator.clipboard.writeText(pitch);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* clipboard unavailable */ }
+  };
 
   const refreshStats = useCallback(async () => {
     try {
@@ -111,29 +167,32 @@ export default function HuntPage() {
               )}
 
               {results.map((r, i) => (
-                <div key={r.place_id || i} className="border border-cyber-border rounded-lg bg-surface/40 p-3 hover-lift group cursor-pointer">
+                <button
+                  key={r.place_id || i}
+                  onClick={() => openLead(r)}
+                  className={`w-full text-left border rounded-lg bg-surface/40 p-3 hover-lift group cursor-pointer ${selected?.place_id === r.place_id ? 'border-primary/50' : 'border-cyber-border'}`}
+                >
                   <div className="flex justify-between items-start mb-2">
                     <span className="font-mono text-[11px] text-agent-active-glow bg-agent-active-glow/10 px-1.5 py-0.5 rounded">NEW_TARGET</span>
-                    <span className="font-mono text-[11px] text-on-surface-variant">Just now</span>
+                    <div className="flex items-center gap-1" title="Predictive lead score (0-100)">
+                      <span className={`font-mono text-sm font-bold ${scoreColor(r.score ?? 0)}`}>{r.score ?? 0}</span>
+                      <span className="font-mono text-[9px] text-on-surface-variant">/100</span>
+                    </div>
                   </div>
                   <h4 className="font-bold text-on-surface mb-1 truncate">{r.business_name}</h4>
-                  <p className="text-[13px] text-on-surface-variant mb-3 truncate" title={r.location}>{r.category} • {r.location}</p>
-                  <p className="text-[11px] text-secondary font-mono mb-2 truncate">Rating: {r.rating}</p>
-                  <div className="flex justify-between items-end">
-                    <div className="w-full">
-                      <div className="font-mono text-[11px] text-on-surface-variant mb-1">RATING</div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-16 h-1 bg-surface-container-high rounded overflow-hidden">
-                          <div className="h-full bg-primary" style={{ width: `${r.rating !== 'N/A' ? (parseFloat(r.rating) / 5) * 100 : 0}%` }}></div>
-                        </div>
-                        <span className="font-mono text-[10px] text-on-surface-variant">{r.rating}</span>
-                      </div>
+                  <p className="text-[13px] text-on-surface-variant mb-3 truncate" title={r.location}>{r.category.replace(/_/g, ' ')} • {r.location}</p>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 font-mono text-[10px] text-on-surface-variant">
+                      <span className="flex items-center gap-1"><Star size={11} className="text-warning" /> {r.rating}</span>
+                      <span className="flex items-center gap-1"><Users size={11} /> {r.user_rating_count ?? 0}</span>
                     </div>
-                    {r.website_uri && r.website_uri !== "No website found" && (
-                       <a href={r.website_uri} target="_blank" rel="noopener noreferrer" className="text-primary font-mono text-[10px] hover:underline whitespace-nowrap">WEBSITE</a>
+                    {r.website_uri && r.website_uri !== "No website found" ? (
+                      <span className="flex items-center gap-1 text-primary font-mono text-[10px]"><Globe size={11} /> SITE</span>
+                    ) : (
+                      <span className="font-mono text-[10px] text-on-surface-variant/50">NO SITE</span>
                     )}
                   </div>
-                </div>
+                </button>
               ))}
 
             </div>
@@ -237,6 +296,86 @@ export default function HuntPage() {
           </div>
         </div>
       </div>
+
+      {/* Lead detail / outreach slide-out */}
+      {selected && (
+        <div className="fixed inset-0 z-[60] flex justify-end" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-obsidian-deep/60 backdrop-blur-sm animate-fade-in" onClick={() => setSelected(null)} />
+          <aside className="relative glass-elevated w-full max-w-md h-full flex flex-col animate-fade-in overflow-hidden">
+            <div className="p-4 border-b border-cyber-border flex items-start justify-between">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_var(--color-primary)]" />
+                  <span className="font-mono text-[11px] uppercase tracking-wider text-primary">Lead Target</span>
+                </div>
+                <h2 className="font-bold text-on-surface text-lg truncate">{selected.business_name}</h2>
+              </div>
+              <button onClick={() => setSelected(null)} aria-label="Close" className="text-on-surface-variant hover:text-on-surface mt-1">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-5 terminal-scroll">
+              {/* Score + signals */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="glass-panel rounded-lg p-3 text-center">
+                  <div className={`text-2xl font-bold ${scoreColor(selected.score ?? 0)}`}>{selected.score ?? 0}</div>
+                  <div className="font-mono text-[9px] uppercase tracking-wider text-on-surface-variant mt-1">Lead Score</div>
+                </div>
+                <div className="glass-panel rounded-lg p-3 text-center">
+                  <div className="text-2xl font-bold text-on-surface">{selected.rating}</div>
+                  <div className="font-mono text-[9px] uppercase tracking-wider text-on-surface-variant mt-1">Rating</div>
+                </div>
+                <div className="glass-panel rounded-lg p-3 text-center">
+                  <div className="text-2xl font-bold text-on-surface">{selected.user_rating_count ?? 0}</div>
+                  <div className="font-mono text-[9px] uppercase tracking-wider text-on-surface-variant mt-1">Reviews</div>
+                </div>
+              </div>
+
+              <div className="space-y-2 font-mono text-[12px]">
+                <div className="flex gap-2"><MapPin size={14} className="text-strategic-violet shrink-0 mt-0.5" /><span className="text-on-surface-variant">{selected.location}</span></div>
+                <div className="flex gap-2"><Database size={14} className="text-telemetry-blue shrink-0 mt-0.5" /><span className="text-on-surface-variant">{selected.category.replace(/_/g, ' ')}</span></div>
+                <div className="flex gap-2">
+                  <Globe size={14} className="text-primary shrink-0 mt-0.5" />
+                  {selected.website_uri && selected.website_uri !== 'No website found' ? (
+                    <a href={selected.website_uri} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline truncate">{selected.website_uri}</a>
+                  ) : (
+                    <span className="text-on-surface-variant/60">No website found — strong opening angle</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Outreach */}
+              <div>
+                <button
+                  onClick={generatePitch}
+                  disabled={pitchLoading}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-primary text-on-primary-fixed font-mono text-[12px] font-bold uppercase tracking-wider hover:brightness-110 transition-all disabled:opacity-50"
+                >
+                  {pitchLoading ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
+                  {pitchLoading ? 'Generating...' : pitch ? 'Regenerate Pitch' : 'Generate Pitch'}
+                </button>
+
+                {pitchError && (
+                  <div role="alert" className="mt-3 text-[12px] rounded-lg px-3 py-2 border border-error/30 bg-error/10 text-error font-mono">{pitchError}</div>
+                )}
+
+                {pitch && (
+                  <div className="mt-3 glass-panel rounded-lg overflow-hidden">
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-cyber-border">
+                      <span className="font-mono text-[10px] uppercase tracking-wider text-on-surface-variant">Generated Outreach</span>
+                      <button onClick={copyPitch} className="flex items-center gap-1 text-on-surface-variant hover:text-primary transition-colors font-mono text-[10px]">
+                        {copied ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy</>}
+                      </button>
+                    </div>
+                    <pre className="p-3 text-[12px] text-on-surface whitespace-pre-wrap font-sans leading-relaxed max-h-80 overflow-y-auto terminal-scroll">{pitch}</pre>
+                  </div>
+                )}
+              </div>
+            </div>
+          </aside>
+        </div>
+      )}
     </div>
   );
 }

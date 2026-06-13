@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { TopNav } from '@/components/layout/TopNav';
-import { Activity, Box, Radio, Zap, ShieldAlert, Plus, MoreVertical, Play, Square, Settings, Database, Clock, X, Loader2 } from 'lucide-react';
+import { Activity, Box, Radio, Zap, ShieldAlert, Plus, Play, Database, Clock, X, Loader2, RotateCw } from 'lucide-react';
 import { Agent } from '@/lib/types';
-import { ComingSoon } from '@/components/ui/ComingSoon';
 
 const MODEL_OPTIONS = [
   'gemini-2.5-flash',
@@ -94,6 +93,19 @@ export default function AgentsPage() {
     }
   };
 
+  const restartAgent = async (agentId: string) => {
+    try {
+      await fetch('/api/agents', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agent_id: agentId, status: 'idle' }),
+      });
+      await fetchAgents();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const triggerTask = async (agentId: string) => {
     // Optimistic UI update could be added here
     try {
@@ -144,21 +156,13 @@ export default function AgentsPage() {
                   Fleet Capacity: {agents.length}{capacityLimit !== null ? `/${capacityLimit}` : ''} Instances · {agents.filter(a => a.status === 'running').length} running
                 </p>
               </div>
-              <div className="flex gap-3">
-                <ComingSoon label="MCP integration coming soon">
-                  <span className="flex items-center gap-2 px-4 py-2 border border-surface-border text-on-surface rounded-md font-mono text-xs uppercase tracking-wider">
-                    <Database size={14} />
-                    Connect MCP
-                  </span>
-                </ComingSoon>
-                <button
-                  onClick={() => { setSpawnError(null); setSpawnOpen(true); }}
-                  className="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary-fixed hover:brightness-110 rounded-md font-mono text-xs uppercase tracking-wider transition-all"
-                >
-                  <Plus size={14} />
-                  Spawn Agent
-                </button>
-              </div>
+              <button
+                onClick={() => { setSpawnError(null); setSpawnOpen(true); }}
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary-fixed hover:brightness-110 rounded-md font-mono text-xs uppercase tracking-wider transition-all"
+              >
+                <Plus size={14} />
+                Spawn Agent
+              </button>
             </div>
 
             {/* Agent Grid */}
@@ -179,9 +183,6 @@ export default function AgentsPage() {
                         <p className="text-on-surface-variant text-xs font-mono mt-1">{agent.role}</p>
                       </div>
                     </div>
-                    <ComingSoon label="Agent menu coming soon">
-                      <span className="text-on-surface-variant"><MoreVertical size={16} /></span>
-                    </ComingSoon>
                   </div>
 
                   {/* Status Bar */}
@@ -216,13 +217,12 @@ export default function AgentsPage() {
                       <Radio size={12} /> {agent.id}
                     </div>
                     <div className="flex gap-2 items-center">
-                      <ComingSoon label="Agent settings coming soon">
-                        <span className="p-1.5 text-on-surface-variant"><Settings size={14} /></span>
-                      </ComingSoon>
-                      <ComingSoon label="Stop/lifecycle controls coming soon">
-                        <span className="p-1.5 text-warning"><Square size={14} fill="currentColor" /></span>
-                      </ComingSoon>
-                      {agent.status !== 'running' && (
+                      {agent.status === 'error' && (
+                        <button onClick={() => restartAgent(agent.id)} className="flex items-center gap-1 px-2 py-1 text-warning hover:bg-warning/10 rounded transition-colors font-mono text-[10px] uppercase tracking-wider" title="Restart / diagnose">
+                          <RotateCw size={13} /> Restart
+                        </button>
+                      )}
+                      {agent.status !== 'running' && agent.status !== 'error' && (
                          <button onClick={() => triggerTask(agent.id)} className="p-1.5 text-primary hover:text-primary/80 hover:bg-primary/10 rounded transition-colors" title="Run a test task">
                             <Play size={14} fill="currentColor" />
                         </button>

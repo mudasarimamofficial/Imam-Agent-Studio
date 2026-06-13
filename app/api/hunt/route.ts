@@ -4,6 +4,7 @@ import { executeHunt } from '@/lib/hunt/engine';
 import { ApiResponse, HuntResult } from '@/lib/types';
 import { persistLog, logger } from '@/lib/logger';
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
+import { getUserSecrets } from '@/lib/settings';
 
 export async function POST(req: Request) {
   const { supabase, user } = await getAuthenticatedUser();
@@ -29,7 +30,8 @@ export async function POST(req: Request) {
     }
 
     logger.info('hunt_api', 'POST /api/hunt', { query });
-    const results = await executeHunt(query);
+    const secrets = await getUserSecrets(supabase);
+    const results = await executeHunt(query, secrets.places);
 
     if (results.length > 0) {
       const rows = results.map((r) => ({
@@ -41,10 +43,15 @@ export async function POST(req: Request) {
         rating: r.rating,
         website_uri: r.website_uri ?? null,
         place_id: r.place_id ?? null,
+        user_rating_count: r.user_rating_count ?? 0,
+        score: r.score ?? 0,
+        updated_at: new Date().toISOString(),
       }));
+      // Merge-upsert on (user_id, place_id): no duplicates, and re-hunts
+      // refresh rating/website/score rather than being silently ignored.
       const { error: leadErr } = await supabase
         .from("hunt_leads")
-        .upsert(rows, { onConflict: "user_id,place_id", ignoreDuplicates: true });
+        .upsert(rows, { onConflict: "user_id,place_id" });
       if (leadErr) logger.warn('hunt_api', 'Failed to persist leads', { message: leadErr.message });
     }
 

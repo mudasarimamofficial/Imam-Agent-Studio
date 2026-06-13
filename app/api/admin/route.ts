@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/supabase/server';
-import { ApiResponse, AdminConfig } from '@/lib/types';
+import { AdminConfig } from '@/lib/types';
 import { logger } from '@/lib/logger';
 
 export async function GET() {
@@ -11,16 +11,31 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("settings")
-    .select("agent_concurrency_limit, memory_retention_days, routing_weight_gemini, routing_weight_nvidia")
-    .single<AdminConfig>();
+    .select("agent_concurrency_limit, memory_retention_days, routing_weight_gemini, routing_weight_nvidia, gemini_api_key, nvidia_api_key, google_places_api_key")
+    .single<AdminConfig & { gemini_api_key: string | null; nvidia_api_key: string | null; google_places_api_key: string | null }>();
 
   if (error) {
     logger.error('admin_api', 'GET /api/admin failed', { message: error.message });
     return NextResponse.json({ success: false, error: { message: error.message } }, { status: 500 });
   }
 
-  const res: ApiResponse<AdminConfig> = { success: true, data };
-  return NextResponse.json(res);
+  // Never return raw key values — only whether each is configured (user key
+  // or, as a fallback indicator, an env key on the server).
+  const payload = {
+    agent_concurrency_limit: data!.agent_concurrency_limit,
+    memory_retention_days: data!.memory_retention_days,
+    routing_weight_gemini: data!.routing_weight_gemini,
+    routing_weight_nvidia: data!.routing_weight_nvidia,
+    keys: {
+      gemini: !!(data!.gemini_api_key || process.env.GEMINI_API_KEY),
+      nvidia: !!(data!.nvidia_api_key || process.env.NVIDIA_API_KEY),
+      places: !!(data!.google_places_api_key || process.env.GOOGLE_PLACES_API_KEY),
+      gemini_user: !!data!.gemini_api_key,
+      nvidia_user: !!data!.nvidia_api_key,
+      places_user: !!data!.google_places_api_key,
+    },
+  };
+  return NextResponse.json({ success: true, data: payload });
 }
 
 export async function POST(req: Request) {
@@ -57,19 +72,32 @@ export async function POST(req: Request) {
       }
     }
 
-    const { data, error } = await supabase
+    // API key writes (write-only). Empty string clears a stored key.
+    const keyUpdate: Record<string, string | null> = {};
+    const keyMap: Record<string, string> = {
+      gemini_api_key: 'gemini_api_key',
+      nvidia_api_key: 'nvidia_api_key',
+      google_places_api_key: 'google_places_api_key',
+    };
+    for (const col of Object.keys(keyMap)) {
+      if (body[col] !== undefined) {
+        if (typeof body[col] !== 'string' || body[col].length > 400) {
+          return NextResponse.json({ success: false, error: { message: `${col} must be a string (max 400 chars)` } }, { status: 400 });
+        }
+        keyUpdate[col] = body[col].trim() === '' ? null : body[col].trim();
+      }
+    }
+
+    const { error } = await supabase
       .from("settings")
-      .update({ ...update, updated_at: new Date().toISOString() })
-      .eq("user_id", user.id)
-      .select("agent_concurrency_limit, memory_retention_days, routing_weight_gemini, routing_weight_nvidia")
-      .single<AdminConfig>();
+      .update({ ...update, ...keyUpdate, updated_at: new Date().toISOString() })
+      .eq("user_id", user.id);
 
     if (error) {
       return NextResponse.json({ success: false, error: { message: error.message } }, { status: 500 });
     }
 
-    const res: ApiResponse<AdminConfig> = { success: true, data };
-    return NextResponse.json(res);
+    return NextResponse.json({ success: true, data: { saved: true } });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
     logger.error('admin_api', 'POST /api/admin error', { message });

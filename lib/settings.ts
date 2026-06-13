@@ -21,3 +21,25 @@ export async function getUserSettings(supabase: SupabaseClient): Promise<AdminCo
     routing_weight_nvidia: Number(data.routing_weight_nvidia),
   };
 }
+
+export interface UserSecrets {
+  gemini: string | null;
+  nvidia: string | null;
+  places: string | null;
+}
+
+/**
+ * Loads the user's stored API keys (server-side only — never send these to the
+ * client). Engines prefer these over process.env so a user can bring their own.
+ */
+export async function getUserSecrets(supabase: SupabaseClient): Promise<UserSecrets> {
+  const { data } = await supabase
+    .from("settings")
+    .select("gemini_api_key, nvidia_api_key, google_places_api_key")
+    .single<{ gemini_api_key: string | null; nvidia_api_key: string | null; google_places_api_key: string | null }>();
+  return {
+    gemini: data?.gemini_api_key?.trim() || null,
+    nvidia: data?.nvidia_api_key?.trim() || null,
+    places: data?.google_places_api_key?.trim() || null,
+  };
+}

@@ -45,6 +45,8 @@ export interface HuntResult {
   insight: string;
   place_id?: string;
   website_uri?: string;
+  user_rating_count?: number;
+  score?: number;
 }
 
 export interface WorkflowNode {

@@ -11,12 +11,24 @@ export async function GET(req: Request) {
 
   const { searchParams } = new URL(req.url);
   const limit = Math.min(parseInt(searchParams.get("limit") || "100", 10) || 100, 500);
+  const q = (searchParams.get("q") || "").trim();
+  const agent = (searchParams.get("agent") || "").trim();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("memories")
     .select("*")
     .order("created_at", { ascending: false })
     .limit(limit);
+
+  if (q) {
+    const escaped = q.replace(/[%_]/g, (m) => `\\${m}`);
+    query = query.ilike("content", `%${escaped}%`);
+  }
+  if (agent) {
+    query = query.eq("agent_label", agent);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     logger.error('memory_api', 'GET /api/memory failed', { message: error.message });

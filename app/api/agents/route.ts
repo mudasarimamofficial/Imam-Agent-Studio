@@ -81,6 +81,39 @@ export async function PUT(req: Request) {
   }
 }
 
+// Restart / reset an agent's lifecycle status (e.g. recover from 'error').
+export async function PATCH(req: Request) {
+  const { supabase, user } = await getAuthenticatedUser();
+  if (!user) {
+    return NextResponse.json({ success: false, error: { message: "Unauthorized" } }, { status: 401 });
+  }
+
+  try {
+    const { agent_id, status } = await req.json();
+    const ALLOWED_STATUS = ['idle', 'active', 'offline'];
+    if (!agent_id || typeof agent_id !== 'string') {
+      return NextResponse.json({ success: false, error: { message: "agent_id is required" } }, { status: 400 });
+    }
+    const next = ALLOWED_STATUS.includes(status) ? status : 'idle';
+
+    const { data, error } = await supabase
+      .from("agents")
+      .update({ status: next, last_active_at: new Date().toISOString() })
+      .eq("id", agent_id)
+      .select()
+      .single<Agent>();
+
+    if (error || !data) {
+      return NextResponse.json({ success: false, error: { message: error?.message ?? "Agent not found" } }, { status: 404 });
+    }
+    logger.info('agents_api', 'Agent status reset', { id: agent_id, status: next });
+    return NextResponse.json({ success: true, data });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ success: false, error: { message } }, { status: 500 });
+  }
+}
+
 export async function POST(req: Request) {
   const { supabase, user } = await getAuthenticatedUser();
   if (!user) {

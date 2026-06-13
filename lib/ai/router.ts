@@ -7,6 +7,12 @@ export interface RoutingWeights {
   nvidia: number;
 }
 
+/** User-provided keys take precedence over environment keys. */
+export interface ProviderKeys {
+  gemini?: string | null;
+  nvidia?: string | null;
+}
+
 const GEMINI_MODELS = { reasoning: 'gemini-2.5-pro', fast: 'gemini-2.5-flash' };
 // NOTE: verify IDs with a real chat/completions call before changing — the
 // NVIDIA catalog lists models (e.g. llama-3.1-405b) that 404 at inference time.
@@ -24,14 +30,17 @@ const REASONING_TASKS = ['reasoning', 'planning'];
  */
 export async function routeAI(
   input: RouterInput,
-  weights: RoutingWeights = { gemini: 0.5, nvidia: 0.5 }
+  weights: RoutingWeights = { gemini: 0.5, nvidia: 0.5 },
+  keys: ProviderKeys = {}
 ): Promise<RouterOutput> {
   const isReasoning = REASONING_TASKS.includes(input.taskType);
 
-  const geminiAvailable = !!process.env.GEMINI_API_KEY;
-  const nvidiaAvailable = !!process.env.NVIDIA_API_KEY;
+  const geminiKey = keys.gemini || process.env.GEMINI_API_KEY || '';
+  const nvidiaKey = keys.nvidia || process.env.NVIDIA_API_KEY || '';
+  const geminiAvailable = !!geminiKey;
+  const nvidiaAvailable = !!nvidiaKey;
   if (!geminiAvailable && !nvidiaAvailable) {
-    throw new Error("No AI provider configured: set GEMINI_API_KEY and/or NVIDIA_API_KEY");
+    throw new Error("No AI provider configured: add a Gemini or NVIDIA key in Enterprise → API Keys, or set env vars");
   }
 
   const geminiScore = geminiAvailable ? weights.gemini + (isReasoning ? 0.25 : 0) : -1;
@@ -53,8 +62,8 @@ export async function routeAI(
 
     try {
       const result = provider === 'gemini'
-        ? await runGemini(input, model)
-        : await runNvidia(input, model);
+        ? await runGemini(input, model, geminiKey)
+        : await runNvidia(input, model, nvidiaKey);
 
       return {
         model_used: model,
@@ -73,8 +82,8 @@ export async function routeAI(
   throw lastError instanceof Error ? lastError : new Error("All AI providers failed");
 }
 
-async function runGemini(input: RouterInput, model: string): Promise<string> {
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+async function runGemini(input: RouterInput, model: string, apiKey: string): Promise<string> {
+  const ai = new GoogleGenAI({ apiKey });
   const prompt = input.messages.map(m => m.content).join('\n');
 
   // The SDK doesn't expose AbortController, so enforce the deadline with a
@@ -100,8 +109,7 @@ async function runGemini(input: RouterInput, model: string): Promise<string> {
   return response.text || '';
 }
 
-async function runNvidia(input: RouterInput, model: string): Promise<string> {
-  const apiKey = process.env.NVIDIA_API_KEY;
+async function runNvidia(input: RouterInput, model: string, apiKey: string): Promise<string> {
   const baseUrl = process.env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1";
   if (!apiKey) throw new Error("Missing NVIDIA_API_KEY");
 

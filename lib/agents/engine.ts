@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { routeAI } from '../ai/router';
-import { getUserSettings } from '../settings';
+import { getUserSettings, getUserSecrets } from '../settings';
 import { TaskPayload, ApiResponse, RouterOutput, Agent } from '../types';
 
 export async function executeAgentTask(
@@ -43,17 +43,20 @@ export async function executeAgentTask(
     .eq("id", agent.id);
 
   try {
+    const secrets = await getUserSecrets(supabase);
     const routerOutput = await routeAI(
       {
         taskType: payload.task_type,
         systemInstruction: `You are agent ${agent.name}, acting as ${agent.role}. Perform the user task.`,
         messages: [{ role: 'user', content: payload.instruction }]
       },
-      { gemini: settings.routing_weight_gemini, nvidia: settings.routing_weight_nvidia }
+      { gemini: settings.routing_weight_gemini, nvidia: settings.routing_weight_nvidia },
+      { gemini: secrets.gemini, nvidia: secrets.nvidia }
     );
 
     await supabase.from("inference_events").insert({
       user_id: userId,
+      agent_id: agent.id,
       model_used: routerOutput.model_used,
       task_type: routerOutput.task_type,
       tokens_estimate: routerOutput.tokens_estimate,

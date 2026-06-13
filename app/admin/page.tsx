@@ -2,31 +2,52 @@
 
 import { useEffect, useState } from 'react';
 import { TopNav } from '@/components/layout/TopNav';
-import { Shield, Key, HardDrive, Users, Activity, Lock, AlertTriangle, Zap, DownloadCloud, Database, Server, Clock } from 'lucide-react';
-import { AdminConfig } from '@/lib/types';
-import { ComingSoon } from '@/components/ui/ComingSoon';
+import { Activity, Zap, Server, Key, Check, Loader2, Eye, EyeOff } from 'lucide-react';
+
+interface AdminState {
+  agent_concurrency_limit: number;
+  memory_retention_days: number;
+  routing_weight_gemini: number;
+  routing_weight_nvidia: number;
+  keys: {
+    gemini: boolean; nvidia: boolean; places: boolean;
+    gemini_user: boolean; nvidia_user: boolean; places_user: boolean;
+  };
+}
+
+type Section = 'compute' | 'keys';
+
+const KEY_FIELDS = [
+  { col: 'gemini_api_key', label: 'Gemini API Key', flag: 'gemini', userFlag: 'gemini_user', hint: 'Google AI Studio key (reasoning/planning).' },
+  { col: 'nvidia_api_key', label: 'NVIDIA API Key', flag: 'nvidia', userFlag: 'nvidia_user', hint: 'NVIDIA NIM key (fast Llama inference).' },
+  { col: 'google_places_api_key', label: 'Google Places API Key', flag: 'places', userFlag: 'places_user', hint: 'Powers the Client Hunt Engine.' },
+] as const;
 
 export default function AdminPage() {
-  const [config, setConfig] = useState<AdminConfig | null>(null);
+  const [config, setConfig] = useState<AdminState | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [section, setSection] = useState<Section>('compute');
 
-  useEffect(() => {
-    async function loadConfig() {
-      try {
-        const res = await fetch('/api/admin');
-        const json = await res.json();
-        if (json.data) {
-          setConfig(json.data);
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
+  // Key inputs (write-only; never pre-filled with real values)
+  const [keyInputs, setKeyInputs] = useState<Record<string, string>>({});
+  const [showKey, setShowKey] = useState<Record<string, boolean>>({});
+  const [keySaving, setKeySaving] = useState(false);
+  const [keySaved, setKeySaved] = useState(false);
+
+  const loadConfig = async () => {
+    try {
+      const res = await fetch('/api/admin');
+      const json = await res.json();
+      if (json.data) setConfig(json.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
-    loadConfig();
-  }, []);
+  };
+
+  useEffect(() => { loadConfig(); }, []);
 
   const handleSave = async () => {
     if (!config) return;
@@ -35,7 +56,12 @@ export default function AdminPage() {
       await fetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config)
+        body: JSON.stringify({
+          agent_concurrency_limit: config.agent_concurrency_limit,
+          memory_retention_days: config.memory_retention_days,
+          routing_weight_gemini: config.routing_weight_gemini,
+          routing_weight_nvidia: config.routing_weight_nvidia,
+        }),
       });
     } catch (err) {
       console.error(err);
@@ -44,200 +70,188 @@ export default function AdminPage() {
     }
   };
 
-  const handleConcurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (config) {
-      setConfig({ ...config, agent_concurrency_limit: parseInt(e.target.value, 10) });
+  const handleSaveKeys = async () => {
+    const payload: Record<string, string> = {};
+    for (const f of KEY_FIELDS) {
+      if (keyInputs[f.col] !== undefined && keyInputs[f.col] !== '') payload[f.col] = keyInputs[f.col];
+    }
+    if (Object.keys(payload).length === 0) return;
+    setKeySaving(true);
+    setKeySaved(false);
+    try {
+      await fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      setKeyInputs({});
+      setKeySaved(true);
+      await loadConfig();
+      setTimeout(() => setKeySaved(false), 2500);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setKeySaving(false);
     }
   };
 
-  const handleRoutingChange = (model: 'gemini' | 'nvidia', value: number) => {
-    if (config) {
-      setConfig({
-        ...config,
-        [model === 'gemini' ? 'routing_weight_gemini' : 'routing_weight_nvidia']: value
-      });
-    }
-  };
+  const navItem = (id: Section, icon: React.ReactNode, label: string) => (
+    <button
+      onClick={() => setSection(id)}
+      aria-current={section === id ? 'page' : undefined}
+      className={`w-full p-3 flex items-center gap-3 font-medium rounded-md transition-colors text-left ${
+        section === id ? 'bg-surface-elevated border-l-2 border-primary text-on-surface' : 'text-on-surface-variant hover:bg-surface-elevated/50'
+      }`}
+    >
+      {icon} {label}
+    </button>
+  );
 
   return (
     <div className="flex flex-col h-full bg-background relative overflow-hidden">
-      
-      {/* Background Effect */}
       <div className="absolute inset-0 z-0 opacity-20 pointer-events-none">
         <div className="absolute top-[10%] left-[60%] w-[600px] h-[600px] bg-primary/5 rounded-full blur-[150px]"></div>
       </div>
 
       <div className="relative z-10 flex flex-col h-full">
-        <TopNav 
-          title="System Admin & Settings"
-          tabs={[
-            'General',
-            'Auth & Security',
-            'API Keys',
-            'Compute Usage',
-            'Audit Logs',
-          ]}
-          activeTab="General"
-        />
+        <TopNav title="Enterprise" tabs={['Configuration']} activeTab="Configuration" />
 
         <div className="flex-1 overflow-auto p-6 md:p-10">
           <div className="max-w-5xl mx-auto space-y-8">
-            
-            {/* Header */}
             <div>
               <h2 className="text-2xl font-bold font-sans tracking-tight text-on-surface">System Configuration</h2>
               <p className="text-on-surface-variant mt-2 max-w-2xl">
-                Manage your self-hosted instance of Imam Agent Studio. Adjust memory constraints, update global LLM routing, and review system telemetrics.
+                Manage your instance of Imam Agent Studio: compute limits, LLM routing, and your own provider API keys.
               </p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              
-              {/* Left Column: Settings Nav */}
+              {/* Left nav */}
               <div className="lg:col-span-1 space-y-2">
-                <div aria-current="page" className="p-3 bg-surface-elevated border-l-2 border-primary text-on-surface flex items-center gap-3 font-medium rounded-r-md">
-                  <Server size={18} className="text-primary"/> Instance Compute
-                </div>
-                <ComingSoon label="Coming soon" className="w-full">
-                  <div className="p-3 text-on-surface-variant flex items-center gap-3 font-medium rounded-md w-full">
-                    <Key size={18} /> Model Secrets
-                  </div>
-                </ComingSoon>
-                <ComingSoon label="Coming soon" className="w-full">
-                  <div className="p-3 text-on-surface-variant flex items-center gap-3 font-medium rounded-md w-full">
-                    <Lock size={18} /> Access Controls
-                  </div>
-                </ComingSoon>
-                <ComingSoon label="Coming soon" className="w-full">
-                  <div className="p-3 text-on-surface-variant flex items-center gap-3 font-medium rounded-md w-full">
-                    <Database size={18} /> Memory Retention
-                  </div>
-                </ComingSoon>
-                <ComingSoon label="Coming soon" className="w-full">
-                  <div className="p-3 text-on-surface-variant flex items-center gap-3 font-medium rounded-md w-full">
-                    <AlertTriangle size={18} /> Emergency Killswitch
-                  </div>
-                </ComingSoon>
+                {navItem('compute', <Server size={18} className={section === 'compute' ? 'text-primary' : ''} />, 'Instance Compute')}
+                {navItem('keys', <Key size={18} className={section === 'keys' ? 'text-primary' : ''} />, 'API Keys')}
               </div>
 
-              {/* Right Column: Settings Content */}
+              {/* Right content */}
               <div className="lg:col-span-2 space-y-8">
-                
                 {loading ? (
                   <div className="text-on-surface-variant animate-pulse font-mono flex items-center gap-2">
                     <Activity size={16} /> LOAD_SYS_CFG...
                   </div>
-                ) : config && (
+                ) : config && section === 'compute' ? (
                   <>
-                  {/* Section 1: Active Instance Details */}
-                  <section className="glass-panel border-surface-border p-6 rounded-xl">
-                    <h3 className="text-lg font-semibold text-on-surface mb-4 flex items-center gap-2">
-                      <Activity size={18} className="text-primary"/> Node Allocation
-                    </h3>
-                    
-                    <div className="space-y-6">
-                      <div>
-                        <div className="flex justify-between mb-2">
-                          <label className="text-sm font-medium text-on-surface-variant">Global Agent Concurrency Limit</label>
-                          <span className="text-sm font-mono text-primary">{config.agent_concurrency_limit} / 100 Agents</span>
+                    <section className="glass-panel border-surface-border p-6 rounded-xl">
+                      <h3 className="text-lg font-semibold text-on-surface mb-4 flex items-center gap-2">
+                        <Activity size={18} className="text-primary" /> Node Allocation
+                      </h3>
+                      <div className="space-y-6">
+                        <div>
+                          <div className="flex justify-between mb-2">
+                            <label className="text-sm font-medium text-on-surface-variant">Global Agent Concurrency Limit</label>
+                            <span className="text-sm font-mono text-primary">{config.agent_concurrency_limit} / 100</span>
+                          </div>
+                          <input type="range" min="1" max="100" value={config.agent_concurrency_limit}
+                            onChange={(e) => setConfig({ ...config, agent_concurrency_limit: parseInt(e.target.value, 10) })}
+                            className="w-full accent-primary bg-surface-elevated h-2 rounded-lg appearance-none cursor-pointer" />
+                          <p className="text-xs text-on-surface-variant mt-2">Max agents allowed to process tasks simultaneously (enforced server-side; returns 429 over limit).</p>
                         </div>
-                        <input
-                          type="range"
-                          min="1"
-                          max="100"
-                          value={config.agent_concurrency_limit}
-                          onChange={handleConcurrencyChange}
-                          className="w-full accent-primary bg-surface-elevated h-2 rounded-lg appearance-none cursor-pointer" 
-                        />
-                        <p className="text-xs text-on-surface-variant mt-2">Maximum number of autonomous agents allowed to process tasks simultaneously.</p>
+                        <div className="pt-4 border-t border-surface-border">
+                          <label className="text-xs uppercase tracking-wider font-mono text-on-surface-variant mb-1 block">Memory Retention</label>
+                          <div className="flex gap-2">
+                            <input type="number" value={config.memory_retention_days}
+                              onChange={(e) => setConfig({ ...config, memory_retention_days: parseInt(e.target.value) || 30 })}
+                              className="w-24 bg-surface-elevated border border-surface-border p-2 rounded text-sm text-on-surface font-mono" />
+                            <span className="text-on-surface-variant self-center text-sm">Days</span>
+                          </div>
+                        </div>
                       </div>
+                    </section>
 
-                      <div className="grid grid-cols-2 gap-4 pt-4 border-t border-surface-border">
-                          <div>
-                            <label className="text-xs uppercase tracking-wider font-mono text-on-surface-variant mb-1 block">Memory Retention</label>
-                            <div className="flex gap-2">
-                               <input 
-                                  type="number" 
-                                  value={config.memory_retention_days}
-                                  onChange={(e) => setConfig({...config, memory_retention_days: parseInt(e.target.value) || 30})}
-                                  className="w-24 bg-surface-elevated border border-surface-border p-2 rounded text-sm text-on-surface font-mono" 
-                               />
-                               <span className="text-on-surface-variant self-center text-sm">Days</span>
+                    <section className="glass-panel border-surface-border p-6 rounded-xl">
+                      <h3 className="text-lg font-semibold text-on-surface mb-4 flex items-center gap-2">
+                        <Zap size={18} className="text-secondary" /> Global LLM Routing Priority
+                      </h3>
+                      <div className="space-y-4">
+                        {([['gemini', 'Gemini (Google)', config.routing_weight_gemini], ['nvidia', 'NVIDIA NIM (Llama)', config.routing_weight_nvidia]] as const).map(([k, label, val]) => (
+                          <div key={k} className="border border-surface-border rounded-lg p-4">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h4 className="font-medium text-on-surface">{label} Weight</h4>
+                                <p className="text-sm text-on-surface-variant mt-1">Routing weight (0–1). Higher wins ties for its task affinity.</p>
+                              </div>
+                              <input type="number" step="0.1" min="0" max="1" value={val}
+                                onChange={(e) => setConfig({ ...config, [k === 'gemini' ? 'routing_weight_gemini' : 'routing_weight_nvidia']: parseFloat(e.target.value) || 0 })}
+                                className="bg-transparent border border-surface-border px-2 py-1 text-on-surface text-center rounded font-mono w-20 outline-none focus:border-primary" />
                             </div>
                           </div>
+                        ))}
                       </div>
+                    </section>
+
+                    <div className="flex justify-end gap-4">
+                      <button className="px-6 py-2 bg-transparent text-on-surface font-medium hover:bg-surface-elevated rounded transition-colors" onClick={() => loadConfig()}>Discard</button>
+                      <button onClick={handleSave} disabled={saving}
+                        className="px-6 py-2 bg-primary text-on-primary-fixed font-medium hover:brightness-110 rounded transition-all shadow-[0_4px_16px_-4px_rgba(var(--primary-rgb),0.4)] disabled:opacity-50">
+                        {saving ? 'Saving...' : 'Save Configuration'}
+                      </button>
                     </div>
-                  </section>
-
-                  {/* Section 2: Model Routing */}
-                  <section className="glass-panel border-surface-border p-6 rounded-xl">
-                     <h3 className="text-lg font-semibold text-on-surface mb-4 flex items-center gap-2">
-                      <Zap size={18} className="text-secondary"/> Global LLM Routing Priority
-                    </h3>
-                    
-                    <div className="space-y-4">
-                      
-                      <div className="group border border-surface-border rounded-lg p-4 hover:border-surface-border-hover transition-colors">
-                        <div className="flex justify-between items-start mb-2">
-                          <div>
-                            <h4 className="font-medium text-on-surface">Gemini (Google) Weight</h4>
-                            <p className="text-sm text-on-surface-variant mt-1">Weight for routing tasks to Gemini models (0-1).</p>
-                          </div>
-                          <input 
-                            type="number" 
-                            step="0.1" 
-                            min="0" 
-                            max="1" 
-                            value={config.routing_weight_gemini}
-                            onChange={(e) => handleRoutingChange('gemini', parseFloat(e.target.value) || 0)}
-                            className="bg-transparent border border-surface-border px-2 py-1 text-on-surface text-center rounded font-mono w-20 outline-none focus:border-primary"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="group border border-surface-border rounded-lg p-4 hover:border-surface-border-hover transition-colors">
-                        <div className="flex justify-between items-start mb-2">
-                          <div>
-                            <h4 className="font-medium text-on-surface">NVIDIA NIM Weight</h4>
-                            <p className="text-sm text-on-surface-variant mt-1">Weight for routing tasks to NVIDIA hosted models (0-1).</p>
-                          </div>
-                          <input 
-                            type="number" 
-                            step="0.1" 
-                            min="0" 
-                            max="1" 
-                            value={config.routing_weight_nvidia}
-                            onChange={(e) => handleRoutingChange('nvidia', parseFloat(e.target.value) || 0)}
-                            className="bg-transparent border border-surface-border px-2 py-1 text-on-surface text-center rounded font-mono w-20 outline-none focus:border-primary"
-                          />
-                        </div>
-                      </div>
-                      
-                    </div>
-                  </section>
-
-                  {/* Actions */}
-                  <div className="flex justify-end gap-4 pt-4">
-                    <button 
-                      className="px-6 py-2 bg-transparent text-on-surface font-medium hover:bg-surface-elevated rounded transition-colors"
-                      onClick={() => window.location.reload()}
-                    >
-                      Discard Changes
-                    </button>
-                    <button 
-                      onClick={handleSave}
-                      disabled={saving}
-                      className="px-6 py-2 bg-primary text-background font-medium hover:brightness-110 rounded transition-colors shadow-[0_0_15px_rgba(var(--primary-rgb),0.3)] disabled:opacity-50"
-                    >
-                      {saving ? 'Saving...' : 'Save Configuration'}
-                    </button>
-                  </div>
                   </>
-                )}
+                ) : config && section === 'keys' ? (
+                  <section className="glass-panel border-surface-border p-6 rounded-xl">
+                    <h3 className="text-lg font-semibold text-on-surface mb-1 flex items-center gap-2">
+                      <Key size={18} className="text-primary" /> Provider API Keys
+                    </h3>
+                    <p className="text-sm text-on-surface-variant mb-5">
+                      Keys are stored on your row-level-secured settings row and used in preference to server env keys. They are never returned to the browser.
+                    </p>
 
+                    <div className="space-y-5">
+                      {KEY_FIELDS.map((f) => {
+                        const configured = config.keys[f.flag as keyof typeof config.keys];
+                        const userSet = config.keys[f.userFlag as keyof typeof config.keys];
+                        return (
+                          <div key={f.col}>
+                            <div className="flex justify-between items-center mb-2">
+                              <label className="text-sm font-medium text-on-surface">{f.label}</label>
+                              <span className={`font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded border ${
+                                userSet ? 'text-primary border-primary/30 bg-primary/10'
+                                : configured ? 'text-telemetry-blue border-telemetry-blue/30 bg-telemetry-blue/10'
+                                : 'text-on-surface-variant border-cyber-border'
+                              }`}>
+                                {userSet ? 'User key set' : configured ? 'Env fallback' : 'Not configured'}
+                              </span>
+                            </div>
+                            <div className="relative">
+                              <input
+                                type={showKey[f.col] ? 'text' : 'password'}
+                                value={keyInputs[f.col] ?? ''}
+                                onChange={(e) => setKeyInputs({ ...keyInputs, [f.col]: e.target.value })}
+                                placeholder={userSet ? '•••••••• (set — enter to replace)' : 'Paste key to enable'}
+                                className="w-full bg-surface-container-low border border-cyber-border rounded-lg px-3 py-2.5 pr-10 text-sm text-on-surface font-mono placeholder-on-surface-variant/40 outline-none focus:border-primary/60 transition-colors"
+                              />
+                              <button type="button" onClick={() => setShowKey({ ...showKey, [f.col]: !showKey[f.col] })}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface" aria-label="Toggle visibility">
+                                {showKey[f.col] ? <EyeOff size={15} /> : <Eye size={15} />}
+                              </button>
+                            </div>
+                            <p className="text-xs text-on-surface-variant mt-1.5">{f.hint}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex items-center justify-end gap-3 mt-6">
+                      {keySaved && <span className="font-mono text-[12px] text-primary flex items-center gap-1"><Check size={14} /> Saved</span>}
+                      <button onClick={handleSaveKeys} disabled={keySaving}
+                        className="px-6 py-2 bg-primary text-on-primary-fixed font-medium hover:brightness-110 rounded transition-all disabled:opacity-50 flex items-center gap-2">
+                        {keySaving ? <Loader2 size={15} className="animate-spin" /> : <Key size={15} />}
+                        {keySaving ? 'Saving...' : 'Save Keys'}
+                      </button>
+                    </div>
+                  </section>
+                ) : null}
               </div>
             </div>
-
           </div>
         </div>
       </div>
