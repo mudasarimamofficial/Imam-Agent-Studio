@@ -101,11 +101,19 @@ export default function AgentsPage() {
                 </p>
               </div>
               <div className="flex gap-3">
-                <button className="flex items-center gap-2 px-4 py-2 border border-surface-border text-on-surface hover:bg-surface-elevated rounded-md font-mono text-xs uppercase tracking-wider transition-colors">
+                <button
+                  className="flex items-center gap-2 px-4 py-2 rounded-md font-mono text-xs uppercase tracking-wider opacity-50 cursor-not-allowed bg-black/40 backdrop-blur-xl border border-white/10 text-on-surface shadow-none"
+                  disabled
+                  title="Coming Soon"
+                >
                   <Database size={14} />
                   Connect MCP
                 </button>
-                <button className="flex items-center gap-2 px-4 py-2 bg-primary text-background hover:brightness-110 rounded-md font-mono text-xs uppercase tracking-wider transition-colors">
+                <button
+                  className="flex items-center gap-2 px-4 py-2 rounded-md font-mono text-xs uppercase tracking-wider opacity-50 cursor-not-allowed bg-black/40 backdrop-blur-xl border border-white/10 text-on-surface shadow-none"
+                  disabled
+                  title="Coming Soon"
+                >
                   <Plus size={14} />
                   Spawn Agent
                 </button>

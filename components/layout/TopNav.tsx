@@ -56,7 +56,11 @@ export function TopNav({ title, tabs, activeTab }: TopNavProps) {
         <button className="hidden md:block text-on-surface font-mono text-[13px] hover:text-primary transition-colors border border-cyber-border px-3 py-1 rounded">
           System HUD
         </button>
-        <button className="bg-primary text-on-primary-fixed px-4 py-1.5 rounded-md font-mono text-[13px] font-bold hover:brightness-110 transition-all shadow-[0_4px_16px_-4px_rgba(var(--primary-rgb),0.4)]">
+        <button
+          className="px-4 py-1.5 rounded-md font-mono text-[13px] font-bold opacity-50 cursor-not-allowed bg-black/40 backdrop-blur-xl border border-white/10 text-on-surface shadow-none"
+          disabled
+          title="Coming Soon"
+        >
           Deploy Agent
         </button>
       </div>
