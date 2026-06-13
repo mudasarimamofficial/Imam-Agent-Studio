@@ -2,13 +2,14 @@
 
 import { useState } from 'react';
 import { TopNav } from '@/components/layout/TopNav';
-import { 
-  Filter, 
-  FileSearch, 
-  LineChart, 
-  Code2, 
-  Bug, 
-  FileText, 
+import { ComingSoon } from '@/components/ui/ComingSoon';
+import {
+  Filter,
+  FileSearch,
+  LineChart,
+  Code2,
+  Bug,
+  FileText,
   MoreVertical,
   Minus,
   Plus,
@@ -70,21 +71,21 @@ export default function WorkflowPage() {
             <p className="font-mono text-[12px] text-on-surface-variant">24+ Available Nodes</p>
           </div>
           <div className="p-3">
-            <div className="relative mb-4">
-              <Filter size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant" />
-              <input 
-                className="w-full bg-background border border-cyber-border rounded px-3 py-1.5 pl-8 text-sm font-sans focus:border-primary/50 focus:outline-none" 
-                placeholder="Filter agents..." 
-                type="text" 
-              />
-            </div>
+            <ComingSoon label="Node filtering coming soon" className="mb-4 w-full">
+              <div className="relative w-full">
+                <Filter size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant" />
+                <span className="block w-full bg-background border border-cyber-border rounded px-3 py-1.5 pl-8 text-sm text-on-surface-variant/50">
+                  Filter agents...
+                </span>
+              </div>
+            </ComingSoon>
             
             <div className="space-y-4 overflow-y-auto max-h-[calc(100vh-16rem)] pb-10 terminal-scroll">
               {/* Category: Analysis */}
               <div>
                 <h3 className="font-mono text-[12px] text-on-surface-variant mb-2 px-1 uppercase">Analysis</h3>
                 <div className="space-y-2">
-                  <div className="bg-surface border border-cyber-border p-2.5 rounded-lg flex items-center gap-3 cursor-grab hover-lift group">
+                  <div className="bg-surface border border-cyber-border p-2.5 rounded-lg flex items-center gap-3 cursor-default hover-lift group">
                     <div className="w-8 h-8 rounded bg-surface-bright flex items-center justify-center text-telemetry-blue group-hover:text-primary transition-colors">
                       <FileSearch size={18} />
                     </div>
@@ -93,7 +94,7 @@ export default function WorkflowPage() {
                       <div className="text-[12px] font-mono text-on-surface-variant">Perplexity-Sonar</div>
                     </div>
                   </div>
-                  <div className="bg-surface border border-cyber-border p-2.5 rounded-lg flex items-center gap-3 cursor-grab hover-lift group">
+                  <div className="bg-surface border border-cyber-border p-2.5 rounded-lg flex items-center gap-3 cursor-default hover-lift group">
                     <div className="w-8 h-8 rounded bg-surface-bright flex items-center justify-center text-telemetry-blue group-hover:text-primary transition-colors">
                       <LineChart size={18} />
                     </div>
@@ -109,7 +110,7 @@ export default function WorkflowPage() {
               <div>
                 <h3 className="font-mono text-[12px] text-on-surface-variant mb-2 px-1 uppercase">Engineering</h3>
                 <div className="space-y-2">
-                  <div className="bg-primary/5 border border-primary/30 p-2.5 rounded-lg flex items-center gap-3 cursor-grab hover-lift">
+                  <div className="bg-primary/5 border border-primary/30 p-2.5 rounded-lg flex items-center gap-3 cursor-default hover-lift">
                     <div className="w-8 h-8 rounded bg-primary/20 flex items-center justify-center text-primary">
                       <Code2 size={18} />
                     </div>
@@ -118,7 +119,7 @@ export default function WorkflowPage() {
                       <div className="text-[12px] font-mono text-primary">DeepSeek-V4-Pro</div>
                     </div>
                   </div>
-                  <div className="bg-surface border border-cyber-border p-2.5 rounded-lg flex items-center gap-3 cursor-grab hover-lift group">
+                  <div className="bg-surface border border-cyber-border p-2.5 rounded-lg flex items-center gap-3 cursor-default hover-lift group">
                     <div className="w-8 h-8 rounded bg-surface-bright flex items-center justify-center text-on-surface-variant group-hover:text-primary transition-colors">
                       <Bug size={18} />
                     </div>
@@ -134,7 +135,7 @@ export default function WorkflowPage() {
               <div>
                 <h3 className="font-mono text-[12px] text-on-surface-variant mb-2 px-1 uppercase">Output</h3>
                 <div className="space-y-2">
-                  <div className="bg-surface border border-cyber-border p-2.5 rounded-lg flex items-center gap-3 cursor-grab hover-lift group">
+                  <div className="bg-surface border border-cyber-border p-2.5 rounded-lg flex items-center gap-3 cursor-default hover-lift group">
                     <div className="w-8 h-8 rounded bg-surface-bright flex items-center justify-center text-strategic-violet group-hover:text-primary transition-colors">
                       <FileText size={18} />
                     </div>
@@ -161,15 +162,17 @@ export default function WorkflowPage() {
             <div className="bg-surface-container/80 backdrop-blur-md border border-cyber-border rounded-lg p-2 flex items-center gap-4 pointer-events-auto shadow-lg">
               <div className="flex flex-col px-2">
                 <span className="text-sm font-semibold text-on-surface">Orchestration_Alpha_01</span>
-                <span className="text-[12px] font-mono text-on-surface-variant">Unsaved changes</span>
+                <span className="text-[12px] font-mono text-on-surface-variant">Static preview · TEST RUN executes a live pipeline</span>
               </div>
               <div className="w-px h-6 bg-cyber-border"></div>
-              <div className="flex items-center gap-2 px-2">
-                <span className="text-[12px] font-mono text-on-surface-variant">SIMULATION MODE</span>
-                <button className="w-10 h-5 rounded-full bg-primary-container relative transition-colors focus:outline-none">
-                  <div className="absolute right-1 top-0.5 w-4 h-4 bg-on-primary-fixed rounded-full shadow-sm"></div>
-                </button>
-              </div>
+              <ComingSoon label="Visual editing coming soon">
+                <div className="flex items-center gap-2 px-2">
+                  <span className="text-[12px] font-mono text-on-surface-variant">SIMULATION MODE</span>
+                  <span className="w-10 h-5 rounded-full bg-primary-container relative block">
+                    <span className="absolute right-1 top-0.5 w-4 h-4 bg-on-primary-fixed rounded-full shadow-sm block"></span>
+                  </span>
+                </div>
+              </ComingSoon>
             </div>
 
             <div className="flex gap-2 pointer-events-auto">
@@ -180,13 +183,15 @@ export default function WorkflowPage() {
                   </span>
                 </div>
               )}
-              <div className="bg-surface-container/80 backdrop-blur-md border border-cyber-border rounded-lg flex items-center p-1 shadow-lg">
-                <button className="p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-bright rounded transition-colors"><Minus size={16}/></button>
-                <span className="text-[12px] font-mono text-on-surface px-2">100%</span>
-                <button className="p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-bright rounded transition-colors"><Plus size={16}/></button>
-                <div className="w-px h-4 bg-cyber-border mx-1"></div>
-                <button className="p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-bright rounded transition-colors"><Maximize size={16}/></button>
-              </div>
+              <ComingSoon label="Canvas zoom/pan coming soon">
+                <div className="bg-surface-container/80 backdrop-blur-md border border-cyber-border rounded-lg flex items-center p-1 shadow-lg">
+                  <span className="p-1.5 text-on-surface-variant"><Minus size={16}/></span>
+                  <span className="text-[12px] font-mono text-on-surface px-2">100%</span>
+                  <span className="p-1.5 text-on-surface-variant"><Plus size={16}/></span>
+                  <span className="w-px h-4 bg-cyber-border mx-1"></span>
+                  <span className="p-1.5 text-on-surface-variant"><Maximize size={16}/></span>
+                </div>
+              </ComingSoon>
               <button 
                 onClick={executeWorkflow}
                 disabled={running}
@@ -215,7 +220,7 @@ export default function WorkflowPage() {
                   </div>
                   <span className="text-sm font-semibold text-on-surface">Web Researcher</span>
                 </div>
-                <button className="text-on-surface-variant hover:text-on-surface"><MoreVertical size={16}/></button>
+                <ComingSoon label="Node config coming soon"><span className="text-on-surface-variant"><MoreVertical size={16}/></span></ComingSoon>
               </div>
               <div className="p-3 space-y-3">
                 <div>
@@ -238,7 +243,7 @@ export default function WorkflowPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_var(--color-primary)] animate-pulse"></div>
-                  <button className="text-on-surface-variant hover:text-on-surface"><MoreVertical size={16}/></button>
+                  <ComingSoon label="Node config coming soon"><span className="text-on-surface-variant"><MoreVertical size={16}/></span></ComingSoon>
                 </div>
               </div>
               <div className="p-3 space-y-4">
@@ -267,7 +272,7 @@ export default function WorkflowPage() {
                   </div>
                   <span className="text-sm font-semibold text-on-surface">QA Engineer</span>
                 </div>
-                <button className="text-on-surface-variant hover:text-on-surface"><MoreVertical size={16}/></button>
+                <ComingSoon label="Node config coming soon"><span className="text-on-surface-variant"><MoreVertical size={16}/></span></ComingSoon>
               </div>
               <div className="p-3 space-y-3">
                 <div>

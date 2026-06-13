@@ -1,311 +1,224 @@
-"use client";
-
-import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import {
-  Terminal,
-  CornerDownLeft,
-  Workflow as WorkflowIcon,
-  CheckCircle,
-  XCircle,
-  Loader2,
-  Wallet,
-  FolderOpen,
-  Menu,
-  FileText,
+  TerminalSquare,
+  Network,
+  Database,
+  Target,
+  Cpu,
+  ArrowRight,
+  ShieldCheck,
   Activity,
-  Gauge
+  Workflow as WorkflowIcon,
 } from 'lucide-react';
-import { MemoryEntry } from '@/lib/types';
-import type { SystemStats } from '@/app/api/stats/route';
 
-function formatTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return `${n}`;
-}
+const FEATURES = [
+  {
+    icon: Network,
+    title: 'Multi-Agent Orchestration',
+    body: 'Deploy a fleet of autonomous agents with live status, task accounting, and a configurable concurrency ceiling enforced at the database layer.',
+    accent: 'text-primary',
+  },
+  {
+    icon: Database,
+    title: 'Memory OS',
+    body: 'Every agent action, reflection, and output is persisted to a row-level-secured store — a durable, queryable memory that survives restarts.',
+    accent: 'text-telemetry-blue',
+  },
+  {
+    icon: Target,
+    title: 'Client Hunt Engine',
+    body: 'Real Google Places intelligence: search, score, and capture leads into your isolated pipeline with website and rating signals.',
+    accent: 'text-strategic-violet',
+  },
+  {
+    icon: Cpu,
+    title: 'Hybrid LLM Routing',
+    body: 'Weighted routing across Gemini and NVIDIA NIM with task-type affinity, automatic fallback, timeouts, and per-call telemetry.',
+    accent: 'text-agent-active-glow',
+  },
+];
 
-function relativeTime(iso: string): string {
-  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
-}
+const STATS = [
+  { label: 'Inference providers', value: '2', note: 'Gemini · NVIDIA' },
+  { label: 'Workflow node types', value: '4', note: 'LLM · API · Memory · Tool' },
+  { label: 'Tenant isolation', value: 'RLS', note: 'Postgres row-level security' },
+];
 
-export default function DashboardPage() {
-  const [command, setCommand] = useState("");
-  const [running, setRunning] = useState(false);
-  const [lastResult, setLastResult] = useState<{ ok: boolean; text: string } | null>(null);
-  const [memories, setMemories] = useState<MemoryEntry[]>([]);
-  const [stats, setStats] = useState<SystemStats | null>(null);
-
-  const refresh = useCallback(async () => {
-    try {
-      const [memRes, statsRes] = await Promise.all([
-        fetch('/api/memory?limit=50'),
-        fetch('/api/stats'),
-      ]);
-      const memJson = await memRes.json();
-      const statsJson = await statsRes.json();
-      setMemories(memJson.data || []);
-      if (statsJson.data) setStats(statsJson.data);
-    } catch (err) {
-      console.error(err);
-    }
-  }, []);
-
-  useEffect(() => {
-    refresh();
-    const interval = setInterval(refresh, 5000);
-    return () => clearInterval(interval);
-  }, [refresh]);
-
-  const handleExecute = async () => {
-    if (!command.trim() || running) return;
-    setRunning(true);
-    setLastResult(null);
-    const cmd = command;
-    setCommand("");
-    try {
-      const res = await fetch('/api/workflow', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: `Command: ${cmd.slice(0, 60)}`,
-          nodes: [
-            { id: 'n1', type: 'llm', input: cmd, status: 'pending' }
-          ]
-        })
-      });
-      const json = await res.json();
-      if (json.success && json.data?.nodes?.[0]?.output) {
-        setLastResult({ ok: true, text: json.data.nodes[0].output });
-      } else {
-        setLastResult({ ok: false, text: json.error?.message || 'Execution failed' });
-      }
-    } catch (e) {
-      console.error(e);
-      setLastResult({ ok: false, text: 'Network error during execution' });
-    } finally {
-      setRunning(false);
-      refresh();
-    }
-  };
-
-  const healthy = stats ? stats.errors_24h === 0 && stats.agents.error === 0 : true;
-
+export default function LandingPage() {
   return (
-    <div className="flex-1 flex flex-col h-full bg-background relative overflow-hidden">
-      {/* TopNavBar (Mobile Only) */}
-      <header className="md:hidden flex justify-between items-center px-4 h-16 w-full sticky top-0 z-50 bg-surface/80 text-primary border-b border-cyber-border backdrop-blur-2xl">
-        <div className="font-bold text-on-surface text-lg">IAS</div>
-        <button className="text-on-surface-variant hover:text-primary transition-all" aria-label="Menu">
-          <Menu size={24} />
-        </button>
-      </header>
+    <div className="min-h-screen w-full overflow-y-auto bg-obsidian-deep text-on-surface">
+      {/* Ambient depth */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute top-[-10%] left-[15%] w-[600px] h-[600px] bg-primary/5 rounded-full blur-[160px]" />
+        <div className="absolute bottom-[-10%] right-[10%] w-[500px] h-[500px] bg-telemetry-blue/5 rounded-full blur-[150px]" />
+      </div>
 
-      {/* Dynamic Grid Layout */}
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden p-6 gap-6 max-w-[1920px] mx-auto w-full">
+      <div className="relative z-10">
+        {/* Nav */}
+        <header className="sticky top-0 z-40 glass-nav">
+          <nav className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-primary-container/20 flex items-center justify-center">
+                <TerminalSquare size={20} className="text-primary" />
+              </div>
+              <div className="leading-none">
+                <div className="font-bold text-on-surface tracking-tight">IAS OS</div>
+                <div className="font-mono text-[10px] uppercase tracking-wider text-on-surface-variant opacity-70 mt-1">
+                  Visual AI Engine
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/login"
+                className="hidden sm:inline-flex font-mono text-[13px] text-on-surface-variant hover:text-on-surface transition-colors px-3 py-2"
+              >
+                Sign in
+              </Link>
+              <Link
+                href="/login"
+                className="inline-flex items-center gap-2 bg-primary text-on-primary-fixed px-4 py-2 rounded-lg font-mono text-[13px] font-bold hover:brightness-110 transition-all shadow-[0_4px_16px_-4px_rgba(var(--primary-rgb),0.4)]"
+              >
+                Launch <ArrowRight size={14} />
+              </Link>
+            </div>
+          </nav>
+        </header>
 
-        {/* Center Column: Command Flow */}
-        <section className="flex-1 flex flex-col min-w-0 gap-6 h-full">
-          {/* Executive Command Input */}
-          <div className="glass-panel rounded-xl p-1 shrink-0 flex items-center px-4 h-[60px] relative focus-within:pulse-active transition-all duration-300">
-            <Terminal size={20} className="text-primary mr-3" />
-            <input
-              className="w-full bg-transparent border-none text-on-surface font-mono text-sm focus:ring-0 placeholder-on-surface-variant/50 outline-none"
-              placeholder="Enter command or intent..."
-              type="text"
-              value={command}
-              onChange={(e) => setCommand(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleExecute()}
-              disabled={running}
-            />
-            <button
-              onClick={handleExecute}
-              disabled={running || !command.trim()}
-              className="ml-2 bg-surface-variant/50 hover:bg-surface-variant px-2 py-1 rounded text-on-surface-variant font-mono text-[10px] flex items-center gap-1 border border-cyber-border transition-colors uppercase disabled:opacity-50"
+        {/* Hero */}
+        <section className="max-w-7xl mx-auto px-6 pt-20 pb-24 md:pt-32 md:pb-32 text-center">
+          <div className="inline-flex items-center gap-2 glass-panel rounded-full px-4 py-1.5 mb-8">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+            <span className="font-mono text-[11px] uppercase tracking-widest text-on-surface-variant">
+              Autonomous Agent Operating System
+            </span>
+          </div>
+
+          <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.05] max-w-4xl mx-auto">
+            The Definitive Visual
+            <br />
+            <span className="bg-gradient-to-r from-primary via-agent-active-glow to-telemetry-blue bg-clip-text text-transparent">
+              AI Operating System
+            </span>
+          </h1>
+
+          <p className="mt-6 text-lg md:text-xl text-on-surface-variant max-w-2xl mx-auto leading-relaxed">
+            Orchestrate a fleet of autonomous agents, a durable memory graph, and hybrid LLM
+            routing — from one frosted-glass mission control. Real execution, real persistence,
+            zero theater.
+          </p>
+
+          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link
+              href="/login"
+              className="group inline-flex items-center gap-2 bg-primary text-on-primary-fixed px-7 py-3.5 rounded-xl font-mono text-sm font-bold uppercase tracking-wider hover:brightness-110 transition-all shadow-[0_8px_30px_-6px_rgba(var(--primary-rgb),0.5)]"
             >
-              {running ? <Activity size={14} className="animate-spin text-primary" /> : <CornerDownLeft size={14} />} Execute
-            </button>
+              Enter Mission Control
+              <ArrowRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
+            </Link>
+            <a
+              href="#features"
+              className="inline-flex items-center gap-2 glass-panel hover-lift px-7 py-3.5 rounded-xl font-mono text-sm text-on-surface uppercase tracking-wider"
+            >
+              Explore Capabilities
+            </a>
           </div>
 
-          {/* Active Operations Flow — live workflows from the database */}
-          <div className="glass-panel rounded-xl flex-1 flex flex-col overflow-hidden relative">
-            <div className="px-4 py-3 border-b border-cyber-border flex justify-between items-center shrink-0 bg-surface-container-low/50">
-              <h2 className="font-mono text-on-surface-variant uppercase tracking-widest text-[10px]">Active Operations Flow</h2>
-              {(running || (stats?.workflows.running ?? 0) > 0) && (
-                <span className="flex items-center gap-1 text-primary font-mono text-[10px]">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
-                  IN-FLIGHT
-                </span>
-              )}
-            </div>
+          {/* Stat strip */}
+          <div className="mt-16 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
+            {STATS.map((s) => (
+              <div key={s.label} className="glass-panel rounded-xl px-5 py-4">
+                <div className="text-3xl font-bold text-on-surface">{s.value}</div>
+                <div className="font-mono text-[11px] uppercase tracking-wider text-on-surface-variant mt-1">
+                  {s.label}
+                </div>
+                <div className="font-mono text-[10px] text-on-surface-variant/60 mt-0.5">{s.note}</div>
+              </div>
+            ))}
+          </div>
+        </section>
 
-            <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4 relative z-10 terminal-scroll">
-              {lastResult && (
-                <div className={`glass-panel rounded-lg p-4 border ${lastResult.ok ? 'border-primary/30 bg-primary/5' : 'border-error/30 bg-error/5'}`}>
-                  <div className="flex justify-between items-start mb-2">
-                    <div className={`font-mono ${lastResult.ok ? 'text-primary' : 'text-error'}`}>
-                      {lastResult.ok ? 'Command Result' : 'Command Failed'}
-                    </div>
-                    <button onClick={() => setLastResult(null)} className="text-on-surface-variant text-xs hover:text-on-surface">dismiss</button>
-                  </div>
-                  <div className="text-[13px] text-on-surface opacity-90 whitespace-pre-wrap max-h-64 overflow-y-auto terminal-scroll">{lastResult.text}</div>
-                </div>
-              )}
-
-              {!stats || stats.workflows.recent.length === 0 ? (
-                <div className="text-on-surface-variant font-mono text-sm text-center mt-10">
-                  {stats ? 'No operations yet. Execute a command to begin.' : 'Loading operations...'}
-                </div>
-              ) : stats.workflows.recent.map((wf) => (
-                <div key={wf.id} className="flex items-start gap-4">
-                  <div className="relative shrink-0 flex flex-col items-center">
-                    <div className={`w-10 h-10 rounded-full border-2 bg-surface flex items-center justify-center z-10 ${
-                      wf.status === 'completed' ? 'border-primary text-primary' :
-                      wf.status === 'running' ? 'border-telemetry-blue text-telemetry-blue' :
-                      wf.status === 'failed' ? 'border-error text-error' :
-                      'border-cyber-border text-on-surface-variant'
-                    }`}>
-                      {wf.status === 'running' ? <Loader2 size={20} className="animate-spin" /> :
-                       wf.status === 'completed' ? <CheckCircle size={20} /> :
-                       wf.status === 'failed' ? <XCircle size={20} /> :
-                       <WorkflowIcon size={20} />}
-                    </div>
-                  </div>
-                  <div className={`flex-1 glass-panel rounded-lg p-4 border ${
-                    wf.status === 'completed' ? 'border-primary/30 bg-primary/5' :
-                    wf.status === 'running' ? 'border-telemetry-blue/30 bg-telemetry-blue/5' :
-                    wf.status === 'failed' ? 'border-error/30 bg-error/5' :
-                    'border-cyber-border'
-                  }`}>
-                    <div className="flex justify-between items-start mb-1">
-                      <div className={`font-mono text-sm truncate pr-2 ${
-                        wf.status === 'completed' ? 'text-primary' :
-                        wf.status === 'running' ? 'text-telemetry-blue' :
-                        wf.status === 'failed' ? 'text-error' : 'text-on-surface'
-                      }`}>{wf.name}</div>
-                      <span className="text-xs text-on-surface-variant whitespace-nowrap">{relativeTime(wf.created_at)}</span>
-                    </div>
-                    <div className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">{wf.status}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
+        {/* Feature grid */}
+        <section id="features" className="max-w-7xl mx-auto px-6 pb-24 scroll-mt-20">
+          <div className="text-center mb-12">
+            <h2 className="text-2xl md:text-4xl font-bold tracking-tight">One console. Every layer.</h2>
+            <p className="mt-3 text-on-surface-variant max-w-xl mx-auto">
+              Each subsystem is wired to a live backend — no mockups, no placeholder numbers.
+            </p>
           </div>
 
-          {/* Real-time Terminal Log */}
-          <div className="glass-panel rounded-xl h-48 shrink-0 flex flex-col overflow-hidden bg-obsidian-deep">
-            <div className="px-4 py-2 border-b border-cyber-border flex justify-between items-center bg-surface-container-low/50">
-              <h2 className="font-mono text-on-surface-variant uppercase tracking-widest text-[10px]">Memory Telemetry Stream</h2>
-              <span className="font-mono text-[10px] text-on-surface-variant">{memories.length} entries</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {FEATURES.map((f) => {
+              const Icon = f.icon;
+              return (
+                <div key={f.title} className="glass-panel hover-lift rounded-2xl p-6 md:p-8 flex flex-col">
+                  <div className={`w-12 h-12 rounded-xl bg-surface-elevated border border-cyber-border flex items-center justify-center mb-5 ${f.accent}`}>
+                    <Icon size={24} />
+                  </div>
+                  <h3 className="text-lg font-semibold text-on-surface mb-2">{f.title}</h3>
+                  <p className="text-sm text-on-surface-variant leading-relaxed">{f.body}</p>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Trust band */}
+        <section className="max-w-7xl mx-auto px-6 pb-24">
+          <div className="glass-elevated rounded-2xl p-8 md:p-12 flex flex-col md:flex-row items-start md:items-center gap-8 justify-between">
+            <div className="flex flex-col gap-4 max-w-xl">
+              <div className="flex items-center gap-2 text-primary">
+                <ShieldCheck size={18} />
+                <span className="font-mono text-[11px] uppercase tracking-widest">Production-grade by default</span>
+              </div>
+              <h3 className="text-2xl md:text-3xl font-bold tracking-tight">Built for real operators.</h3>
+              <p className="text-on-surface-variant text-sm leading-relaxed">
+                Supabase-backed persistence, row-level multi-tenancy, rate limiting, request
+                timeouts with retry, and SSRF-guarded tool execution — the boring guarantees that
+                make an AI platform trustworthy.
+              </p>
             </div>
-            <div className="flex-1 p-3 font-mono text-[11px] text-on-surface-variant overflow-y-auto terminal-scroll whitespace-pre-wrap leading-relaxed tracking-wider flex flex-col-reverse">
-              <span className="text-on-surface animate-pulse">_</span>
-              {memories.map((log) => (
-                 <div key={log.id} className="mb-1">
-                   <span className="text-primary">[{new Date(log.created_at).toLocaleTimeString()}]</span> SYS: {log.agent_label} completed {log.type}: <span className="text-on-surface opacity-80">{log.content.substring(0, 100)}{log.content.length > 100 ? '...' : ''}</span>
-                 </div>
-              ))}
-              <div className="mb-1 text-telemetry-blue">SYS: Agent Telemetry Interface online.</div>
+            <div className="flex flex-col gap-3 font-mono text-[13px] shrink-0">
+              <div className="flex items-center gap-3 text-on-surface-variant">
+                <Activity size={16} className="text-primary" /> Live telemetry &amp; honest health
+              </div>
+              <div className="flex items-center gap-3 text-on-surface-variant">
+                <WorkflowIcon size={16} className="text-telemetry-blue" /> Real multi-node workflows
+              </div>
+              <div className="flex items-center gap-3 text-on-surface-variant">
+                <ShieldCheck size={16} className="text-strategic-violet" /> Per-tenant data isolation
+              </div>
             </div>
           </div>
         </section>
 
-        {/* Right Column: System Intelligence */}
-        <aside className="w-full lg:w-[320px] flex flex-col gap-6 shrink-0">
-          {/* Compute Usage — real inference telemetry */}
-          <div className="glass-panel rounded-xl p-4 flex flex-col gap-4">
-            <div className="flex justify-between items-center mb-1">
-              <h3 className="font-mono text-on-surface-variant uppercase tracking-widest text-[10px]">Compute Usage</h3>
-              <Wallet size={16} className="text-on-surface-variant" />
+        {/* Final CTA */}
+        <section className="max-w-7xl mx-auto px-6 pb-28 text-center">
+          <h2 className="text-3xl md:text-5xl font-bold tracking-tight max-w-3xl mx-auto leading-tight">
+            Your agents are waiting.
+          </h2>
+          <p className="mt-4 text-on-surface-variant">Sign in to take command of the operating system.</p>
+          <Link
+            href="/login"
+            className="mt-8 group inline-flex items-center gap-2 bg-primary text-on-primary-fixed px-8 py-4 rounded-xl font-mono text-sm font-bold uppercase tracking-wider hover:brightness-110 transition-all shadow-[0_8px_30px_-6px_rgba(var(--primary-rgb),0.5)]"
+          >
+            Enter Mission Control
+            <ArrowRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
+          </Link>
+        </section>
+
+        {/* Footer */}
+        <footer className="border-t border-cyber-border">
+          <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2 text-on-surface-variant">
+              <TerminalSquare size={16} className="text-primary" />
+              <span className="font-mono text-[12px]">IAS OS — Imam Agent Studio</span>
             </div>
-            <div>
-              <div className="flex justify-between items-end mb-1">
-                <span className="font-display text-4xl font-bold text-on-surface">{stats ? formatTokens(stats.tokens.lifetime) : '—'}</span>
-                <span className="font-mono text-[11px] text-on-surface-variant">est. tokens (lifetime)</span>
-              </div>
-              <div className="w-full h-1.5 bg-surface-variant rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-primary to-agent-active-glow transition-all"
-                  style={{ width: `${stats && stats.tokens.lifetime > 0 ? Math.round((stats.tokens.today / stats.tokens.lifetime) * 100) : 0}%` }}
-                ></div>
-              </div>
-              <div className="font-mono text-[10px] text-on-surface-variant mt-1">{stats ? formatTokens(stats.tokens.today) : '0'} today</div>
-            </div>
-            <div className="grid grid-cols-2 gap-2 mt-2">
-              <div className="bg-surface-container-low p-2 rounded border border-cyber-border">
-                <div className="font-mono text-[11px] text-on-surface-variant mb-1">INFERENCES</div>
-                <div className="font-mono text-[12px] text-on-surface">{stats?.inferences.lifetime ?? '—'}</div>
-              </div>
-              <div className="bg-surface-container-low p-2 rounded border border-cyber-border">
-                <div className="font-mono text-[11px] text-on-surface-variant mb-1">MEMORIES</div>
-                <div className="font-mono text-[12px] text-on-surface">{stats?.memories.total ?? '—'}</div>
-              </div>
-              <div className="bg-surface-container-low p-2 rounded border border-cyber-border col-span-2">
-                <div className="font-mono text-[11px] text-on-surface-variant mb-1">AVG LATENCY</div>
-                <div className="font-mono text-[12px] text-on-surface">
-                  {stats?.inferences.avg_latency_ms != null ? `${stats.inferences.avg_latency_ms} ms` : 'No inferences yet'}
-                </div>
-              </div>
+            <div className="font-mono text-[11px] text-on-surface-variant/60 uppercase tracking-wider">
+              Isolated tenancy · Row-level security enforced
             </div>
           </div>
-
-          {/* Recent Artifacts — completed workflow outputs */}
-          <div className="glass-panel rounded-xl p-4 flex-1 flex flex-col">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-mono text-on-surface-variant uppercase tracking-widest text-[10px]">Completed Operations</h3>
-              <FolderOpen size={16} className="text-on-surface-variant" />
-            </div>
-            <div className="flex flex-col gap-2 flex-1 overflow-y-auto terminal-scroll">
-              {!stats || stats.workflows.recent.filter(w => w.status === 'completed').length === 0 ? (
-                <div className="text-on-surface-variant font-mono text-[11px] text-center mt-6">No completed operations yet.</div>
-              ) : stats.workflows.recent.filter(w => w.status === 'completed').map((wf) => (
-                <div key={wf.id} className="group flex items-center gap-3 p-2 rounded hover:bg-surface-variant/30 transition-colors border border-transparent hover:border-cyber-border">
-                  <div className="w-8 h-8 rounded bg-surface border border-cyber-border flex items-center justify-center text-primary group-hover:bg-primary/10 transition-colors">
-                    <FileText size={16} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-mono text-[12px] text-on-surface truncate">{wf.name}</div>
-                    <div className="font-mono text-[11px] text-on-surface-variant">{wf.completed_at ? relativeTime(wf.completed_at) : ''}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* System Health HUD — real status */}
-          <div className="glass-panel rounded-xl p-4 flex flex-col shrink-0">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-mono text-on-surface-variant uppercase tracking-widest text-[10px]">System Health</h3>
-              <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded border ${healthy ? 'bg-primary/10 border-primary/20' : 'bg-warning/10 border-warning/20'}`}>
-                <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${healthy ? 'bg-primary' : 'bg-warning'}`}></span>
-                <span className={`font-mono text-[11px] ${healthy ? 'text-primary' : 'text-warning'}`}>{healthy ? 'OPTIMAL' : 'DEGRADED'}</span>
-              </div>
-            </div>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="font-mono text-[11px] text-on-surface-variant">Agents Online</span>
-                <span className="font-mono text-[12px] text-on-surface">
-                  {stats ? `${stats.agents.active + stats.agents.running}/${stats.agents.total}` : '—'}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="font-mono text-[11px] text-on-surface-variant">Errors (24h)</span>
-                <span className={`font-mono text-[12px] ${stats && stats.errors_24h > 0 ? 'text-error' : 'text-on-surface'}`}>{stats?.errors_24h ?? '—'}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="font-mono text-[11px] text-on-surface-variant flex items-center gap-1"><Gauge size={11} /> Concurrency</span>
-                <span className="font-mono text-[12px] text-on-surface">
-                  {stats ? `${stats.agents.running}/${stats.agents.limit}` : '—'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-        </aside>
+        </footer>
       </div>
     </div>
   );

@@ -20,6 +20,7 @@ import {
   Cpu
 } from 'lucide-react';
 import { MemoryEntry } from '@/lib/types';
+import { ComingSoon } from '@/components/ui/ComingSoon';
 
 export default function MemoryPage() {
   const [memories, setMemories] = useState<MemoryEntry[]>([]);
@@ -51,14 +52,14 @@ export default function MemoryPage() {
         {/* Left Sidebar: Semantic Stores */}
         <aside className="w-72 glass-panel rounded-xl flex flex-col overflow-hidden relative z-10">
           <div className="p-3 border-b border-cyber-border/50">
-            <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant" />
-              <input 
-                className="w-full bg-surface-dim border-none border-b border-cyber-border focus:ring-0 focus:border-primary font-mono text-[13px] text-on-surface pl-9 py-2 placeholder-on-surface-variant/50 outline-none" 
-                placeholder="Query the Knowledge Graph..." 
-                type="text" 
-              />
-            </div>
+            <ComingSoon label="Semantic search coming soon" className="w-full">
+              <div className="relative w-full">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant" />
+                <span className="block w-full bg-surface-dim font-mono text-[13px] text-on-surface-variant/50 pl-9 py-2">
+                  Query the Knowledge Graph...
+                </span>
+              </div>
+            </ComingSoon>
           </div>
           
           <div className="flex-1 overflow-y-auto p-3 font-mono text-[12px] text-on-surface-variant flex flex-col gap-4 terminal-scroll">
@@ -114,9 +115,15 @@ export default function MemoryPage() {
           <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px)", backgroundSize: "24px 24px" }}></div>
           
           <div className="absolute top-4 left-4 flex gap-2 z-20">
-            <button className="bg-surface/80 border border-cyber-border rounded p-1.5 text-on-surface-variant hover:text-primary backdrop-blur-md transition-colors"><ZoomIn size={18}/></button>
-            <button className="bg-surface/80 border border-cyber-border rounded p-1.5 text-on-surface-variant hover:text-primary backdrop-blur-md transition-colors"><ZoomOut size={18}/></button>
-            <button className="bg-surface/80 border border-cyber-border rounded p-1.5 text-on-surface-variant hover:text-primary backdrop-blur-md transition-colors"><Focus size={18}/></button>
+            <ComingSoon label="Graph zoom coming soon">
+              <span className="bg-surface/80 border border-cyber-border rounded p-1.5 text-on-surface-variant backdrop-blur-md block"><ZoomIn size={18}/></span>
+            </ComingSoon>
+            <ComingSoon label="Graph zoom coming soon">
+              <span className="bg-surface/80 border border-cyber-border rounded p-1.5 text-on-surface-variant backdrop-blur-md block"><ZoomOut size={18}/></span>
+            </ComingSoon>
+            <ComingSoon label="Re-center coming soon">
+              <span className="bg-surface/80 border border-cyber-border rounded p-1.5 text-on-surface-variant backdrop-blur-md block"><Focus size={18}/></span>
+            </ComingSoon>
           </div>
 
           <svg className="w-full h-full relative z-10" viewBox="0 0 800 600">

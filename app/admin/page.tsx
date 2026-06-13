@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { TopNav } from '@/components/layout/TopNav';
 import { Shield, Key, HardDrive, Users, Activity, Lock, AlertTriangle, Zap, DownloadCloud, Database, Server, Clock } from 'lucide-react';
 import { AdminConfig } from '@/lib/types';
+import { ComingSoon } from '@/components/ui/ComingSoon';
 
 export default function AdminPage() {
   const [config, setConfig] = useState<AdminConfig | null>(null);
@@ -94,21 +95,29 @@ export default function AdminPage() {
               
               {/* Left Column: Settings Nav */}
               <div className="lg:col-span-1 space-y-2">
-                <div className="p-3 bg-surface-elevated border-l-2 border-primary text-on-surface flex items-center gap-3 font-medium rounded-r-md cursor-pointer transition-colors">
+                <div aria-current="page" className="p-3 bg-surface-elevated border-l-2 border-primary text-on-surface flex items-center gap-3 font-medium rounded-r-md">
                   <Server size={18} className="text-primary"/> Instance Compute
                 </div>
-                <div className="p-3 text-on-surface-variant hover:bg-surface-elevated/50 flex items-center gap-3 font-medium rounded-md cursor-pointer transition-colors">
-                  <Key size={18} /> Model Secrets
-                </div>
-                <div className="p-3 text-on-surface-variant hover:bg-surface-elevated/50 flex items-center gap-3 font-medium rounded-md cursor-pointer transition-colors">
-                  <Lock size={18} /> Access Controls
-                </div>
-                <div className="p-3 text-on-surface-variant hover:bg-surface-elevated/50 flex items-center gap-3 font-medium rounded-md cursor-pointer transition-colors">
-                  <Database size={18} /> Memory Retention
-                </div>
-                <div className="p-3 text-on-surface-variant hover:bg-surface-elevated/50 flex items-center gap-3 font-medium rounded-md cursor-pointer transition-colors">
-                  <AlertTriangle size={18} /> Emergency Killswitch
-                </div>
+                <ComingSoon label="Coming soon" className="w-full">
+                  <div className="p-3 text-on-surface-variant flex items-center gap-3 font-medium rounded-md w-full">
+                    <Key size={18} /> Model Secrets
+                  </div>
+                </ComingSoon>
+                <ComingSoon label="Coming soon" className="w-full">
+                  <div className="p-3 text-on-surface-variant flex items-center gap-3 font-medium rounded-md w-full">
+                    <Lock size={18} /> Access Controls
+                  </div>
+                </ComingSoon>
+                <ComingSoon label="Coming soon" className="w-full">
+                  <div className="p-3 text-on-surface-variant flex items-center gap-3 font-medium rounded-md w-full">
+                    <Database size={18} /> Memory Retention
+                  </div>
+                </ComingSoon>
+                <ComingSoon label="Coming soon" className="w-full">
+                  <div className="p-3 text-on-surface-variant flex items-center gap-3 font-medium rounded-md w-full">
+                    <AlertTriangle size={18} /> Emergency Killswitch
+                  </div>
+                </ComingSoon>
               </div>
 
               {/* Right Column: Settings Content */}

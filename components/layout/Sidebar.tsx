@@ -3,27 +3,9 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import {
-  LayoutDashboard,
-  Workflow,
-  Database,
-  Network,
-  Target,
-  ShieldAlert,
-  Plus,
-  TerminalSquare,
-  LogOut
-} from 'lucide-react';
+import { Plus, TerminalSquare, LogOut } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-
-const NAVIGATION = [
-  { name: 'Workspace', href: '/', icon: LayoutDashboard },
-  { name: 'Agent Registry', href: '/agents', icon: Network },
-  { name: 'Architect', href: '/workflow', icon: Workflow },
-  { name: 'Memory', href: '/memory', icon: Database },
-  { name: 'Hunt Center', href: '/hunt', icon: Target },
-  { name: 'Enterprise', href: '/admin', icon: ShieldAlert },
-];
+import { NAVIGATION } from '@/lib/nav';
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -88,10 +70,13 @@ export function Sidebar() {
       </div>
 
       <div className="px-5 mt-auto pt-4">
-        <button className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded bg-primary text-on-primary-fixed font-mono text-[13px] font-bold hover:opacity-90 transition-opacity">
+        <Link
+          href="/agents"
+          className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded bg-primary text-on-primary-fixed font-mono text-[13px] font-bold hover:brightness-110 transition-all"
+        >
           <Plus size={16} />
           New Agent
-        </button>
+        </Link>
         
         <div className="mt-4 flex items-center gap-3 border-t border-cyber-border pt-4">
           <div className="w-8 h-8 rounded-full bg-primary-container/20 border border-cyber-border flex items-center justify-center text-primary font-mono text-sm font-bold uppercase">

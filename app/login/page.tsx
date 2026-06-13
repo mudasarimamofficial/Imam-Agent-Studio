@@ -26,7 +26,7 @@ export default function LoginPage() {
         if (error) {
           setMessage({ kind: 'error', text: error.message });
         } else {
-          router.push('/');
+          router.push('/dashboard');
           router.refresh();
         }
       } else {
@@ -34,7 +34,7 @@ export default function LoginPage() {
         if (error) {
           setMessage({ kind: 'error', text: error.message });
         } else if (data.session) {
-          router.push('/');
+          router.push('/dashboard');
           router.refresh();
         } else {
           setMessage({ kind: 'info', text: 'Account created. Check your email to confirm, then sign in.' });

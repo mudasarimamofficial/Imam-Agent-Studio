@@ -2,8 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import { TopNav } from '@/components/layout/TopNav';
-import { Activity, Box, Radio, Zap, ShieldAlert, Plus, MoreVertical, Play, Square, Settings, Database, Clock } from 'lucide-react';
+import { Activity, Box, Radio, Zap, ShieldAlert, Plus, MoreVertical, Play, Square, Settings, Database, Clock, X, Loader2 } from 'lucide-react';
 import { Agent } from '@/lib/types';
+import { ComingSoon } from '@/components/ui/ComingSoon';
+
+const MODEL_OPTIONS = [
+  'gemini-2.5-flash',
+  'gemini-2.5-pro',
+  'meta/llama-3.3-70b-instruct',
+  'meta/llama-3.1-70b-instruct',
+];
 
 function relativeTime(iso: string | null): string {
   if (!iso) return 'Never';
@@ -21,18 +29,27 @@ export default function AgentsPage() {
   const [loading, setLoading] = useState(true);
   const [capacityLimit, setCapacityLimit] = useState<number | null>(null);
 
-  useEffect(() => {
-    async function fetchAgents() {
-      try {
-        const res = await fetch('/api/agents');
-        const json = await res.json();
-        setAgents(json.data || []);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
+  // Spawn modal state
+  const [spawnOpen, setSpawnOpen] = useState(false);
+  const [spawnName, setSpawnName] = useState("");
+  const [spawnRole, setSpawnRole] = useState("");
+  const [spawnModel, setSpawnModel] = useState(MODEL_OPTIONS[0]);
+  const [spawning, setSpawning] = useState(false);
+  const [spawnError, setSpawnError] = useState<string | null>(null);
+
+  async function fetchAgents() {
+    try {
+      const res = await fetch('/api/agents');
+      const json = await res.json();
+      setAgents(json.data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
+  }
+
+  useEffect(() => {
     async function fetchLimit() {
       try {
         const res = await fetch('/api/admin');
@@ -49,6 +66,33 @@ export default function AgentsPage() {
     const interval = setInterval(fetchAgents, 3000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleSpawn = async () => {
+    if (spawning || !spawnName.trim()) return;
+    setSpawning(true);
+    setSpawnError(null);
+    try {
+      const res = await fetch('/api/agents', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: spawnName.trim(), role: spawnRole.trim(), model: spawnModel }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        setSpawnError(json.error?.message || 'Failed to spawn agent');
+      } else {
+        setSpawnOpen(false);
+        setSpawnName("");
+        setSpawnRole("");
+        setSpawnModel(MODEL_OPTIONS[0]);
+        await fetchAgents();
+      }
+    } catch {
+      setSpawnError('Network error while spawning agent');
+    } finally {
+      setSpawning(false);
+    }
+  };
 
   const triggerTask = async (agentId: string) => {
     // Optimistic UI update could be added here
@@ -101,11 +145,16 @@ export default function AgentsPage() {
                 </p>
               </div>
               <div className="flex gap-3">
-                <button className="flex items-center gap-2 px-4 py-2 border border-surface-border text-on-surface hover:bg-surface-elevated rounded-md font-mono text-xs uppercase tracking-wider transition-colors">
-                  <Database size={14} />
-                  Connect MCP
-                </button>
-                <button className="flex items-center gap-2 px-4 py-2 bg-primary text-background hover:brightness-110 rounded-md font-mono text-xs uppercase tracking-wider transition-colors">
+                <ComingSoon label="MCP integration coming soon">
+                  <span className="flex items-center gap-2 px-4 py-2 border border-surface-border text-on-surface rounded-md font-mono text-xs uppercase tracking-wider">
+                    <Database size={14} />
+                    Connect MCP
+                  </span>
+                </ComingSoon>
+                <button
+                  onClick={() => { setSpawnError(null); setSpawnOpen(true); }}
+                  className="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary-fixed hover:brightness-110 rounded-md font-mono text-xs uppercase tracking-wider transition-all"
+                >
                   <Plus size={14} />
                   Spawn Agent
                 </button>
@@ -130,9 +179,9 @@ export default function AgentsPage() {
                         <p className="text-on-surface-variant text-xs font-mono mt-1">{agent.role}</p>
                       </div>
                     </div>
-                    <button className="text-on-surface-variant hover:text-on-surface">
-                      <MoreVertical size={16} />
-                    </button>
+                    <ComingSoon label="Agent menu coming soon">
+                      <span className="text-on-surface-variant"><MoreVertical size={16} /></span>
+                    </ComingSoon>
                   </div>
 
                   {/* Status Bar */}
@@ -166,17 +215,15 @@ export default function AgentsPage() {
                     <div className="text-[10px] text-on-surface-variant uppercase tracking-widest flex items-center gap-1">
                       <Radio size={12} /> {agent.id}
                     </div>
-                    <div className="flex gap-2">
-                      <button className="p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-elevated rounded transition-colors" title="Settings">
-                        <Settings size={14} />
-                      </button>
-                      {agent.status === 'active' || agent.status === 'running' || agent.status === 'idle' ? (
-                        <button className="p-1.5 text-warning hover:text-warning/80 hover:bg-warning/10 rounded transition-colors" title="Stop">
-                           <Square size={14} fill="currentColor" />
-                        </button>
-                      ) : null }
+                    <div className="flex gap-2 items-center">
+                      <ComingSoon label="Agent settings coming soon">
+                        <span className="p-1.5 text-on-surface-variant"><Settings size={14} /></span>
+                      </ComingSoon>
+                      <ComingSoon label="Stop/lifecycle controls coming soon">
+                        <span className="p-1.5 text-warning"><Square size={14} fill="currentColor" /></span>
+                      </ComingSoon>
                       {agent.status !== 'running' && (
-                         <button onClick={() => triggerTask(agent.id)} className="p-1.5 text-primary hover:text-primary/80 hover:bg-primary/10 rounded transition-colors" title="Test Action">
+                         <button onClick={() => triggerTask(agent.id)} className="p-1.5 text-primary hover:text-primary/80 hover:bg-primary/10 rounded transition-colors" title="Run a test task">
                             <Play size={14} fill="currentColor" />
                         </button>
                       )}
@@ -189,6 +236,81 @@ export default function AgentsPage() {
           </div>
         </div>
       </div>
+
+      {/* Spawn Agent Modal */}
+      {spawnOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-obsidian-deep/70 backdrop-blur-sm animate-fade-in"
+          onClick={() => !spawning && setSpawnOpen(false)}
+        >
+          <div
+            className="glass-elevated rounded-2xl w-full max-w-md p-6 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between mb-5">
+              <div>
+                <h3 className="text-lg font-bold text-on-surface">Spawn Agent</h3>
+                <p className="font-mono text-[11px] text-on-surface-variant mt-1">Deploy a new instance to your fleet</p>
+              </div>
+              <button onClick={() => !spawning && setSpawnOpen(false)} className="text-on-surface-variant hover:text-on-surface" aria-label="Close">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="spawn-name" className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block mb-2">Name</label>
+                <input
+                  id="spawn-name"
+                  value={spawnName}
+                  onChange={(e) => setSpawnName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSpawn()}
+                  placeholder="e.g. Research Scout"
+                  autoFocus
+                  className="w-full bg-surface-container-low border border-cyber-border rounded-lg px-3 py-2.5 text-sm text-on-surface placeholder-on-surface-variant/40 outline-none focus:border-primary/60 transition-colors"
+                />
+              </div>
+              <div>
+                <label htmlFor="spawn-role" className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block mb-2">Role <span className="opacity-50">(optional)</span></label>
+                <input
+                  id="spawn-role"
+                  value={spawnRole}
+                  onChange={(e) => setSpawnRole(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSpawn()}
+                  placeholder="e.g. Market Research"
+                  className="w-full bg-surface-container-low border border-cyber-border rounded-lg px-3 py-2.5 text-sm text-on-surface placeholder-on-surface-variant/40 outline-none focus:border-primary/60 transition-colors"
+                />
+              </div>
+              <div>
+                <label htmlFor="spawn-model" className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block mb-2">Model</label>
+                <select
+                  id="spawn-model"
+                  value={spawnModel}
+                  onChange={(e) => setSpawnModel(e.target.value)}
+                  className="w-full bg-surface-container-low border border-cyber-border rounded-lg px-3 py-2.5 text-sm text-on-surface outline-none focus:border-primary/60 transition-colors font-mono"
+                >
+                  {MODEL_OPTIONS.map((m) => <option key={m} value={m} className="bg-surface-container">{m}</option>)}
+                </select>
+              </div>
+
+              {spawnError && (
+                <div role="alert" className="text-[13px] rounded-lg px-3 py-2 border border-error/30 bg-error/10 text-error font-mono">
+                  {spawnError}
+                </div>
+              )}
+
+              <button
+                onClick={handleSpawn}
+                disabled={spawning || !spawnName.trim()}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-primary text-on-primary-fixed font-mono text-[13px] font-bold uppercase tracking-wider hover:brightness-110 transition-all disabled:opacity-50"
+              >
+                {spawning ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+                {spawning ? 'Spawning...' : 'Deploy Agent'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
