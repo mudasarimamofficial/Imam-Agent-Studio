@@ -31,6 +31,12 @@ export default function HuntPage() {
   const [loading, setLoading] = useState(false);
   const [huntStats, setHuntStats] = useState<SystemStats['hunt'] | null>(null);
 
+  // Live Terminal Logs
+  const [terminalLogs, setTerminalLogs] = useState<string[]>([
+    "> initialize_core_systems()",
+    "> ready for tasking."
+  ]);
+
   // Lead detail / outreach panel
   const [selected, setSelected] = useState<HuntResult | null>(null);
   const [pitch, setPitch] = useState<string | null>(null);
@@ -49,17 +55,48 @@ export default function HuntPage() {
     if (!selected || pitchLoading) return;
     setPitchLoading(true);
     setPitchError(null);
+    setPitch(null);
+    setTerminalLogs(prev => [...prev, `> init_pitch_sequence(target="${selected.business_name}")`]);
+    
     try {
       const res = await fetch('/api/hunt/pitch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(selected),
       });
-      const json = await res.json();
-      if (json.success) setPitch(json.data.pitch);
-      else setPitchError(json.error?.message || 'Failed to generate pitch');
+
+      if (!res.body) throw new Error("No response body");
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let done = false;
+
+      while (!done) {
+        const { value, done: doneReading } = await reader.read();
+        done = doneReading;
+        if (value) {
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n');
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data.type === 'log') {
+                  setTerminalLogs(prev => [...prev, `> ${data.msg}`]);
+                } else if (data.type === 'result') {
+                  setPitch(data.pitch);
+                } else if (data.type === 'error') {
+                  setPitchError(data.msg);
+                }
+              } catch (e) {
+                // partial chunk or invalid json, safe to ignore in this simple parser
+              }
+            }
+          }
+        }
+      }
     } catch {
       setPitchError('Network error generating pitch');
+      setTerminalLogs(prev => [...prev, '> [ERROR] Network failure during stream.']);
     } finally {
       setPitchLoading(false);
     }
@@ -88,6 +125,7 @@ export default function HuntPage() {
 
   const performSearch = async () => {
     setLoading(true);
+    setTerminalLogs(prev => [...prev, `> execute_hunt(query="${query}")`, '> [WORKING] Calling Google Places API...']);
     try {
       const res = await fetch('/api/hunt', {
         method: 'POST',
@@ -95,9 +133,12 @@ export default function HuntPage() {
         body: JSON.stringify({ query })
       });
       const data = await res.json();
-      setResults(data.data || []);
+      const extracted = data.data || [];
+      setResults(extracted);
+      setTerminalLogs(prev => [...prev, `> [SUCCESS] Extracted ${extracted.length} new profiles.`]);
     } catch (e) {
       console.error(e);
+      setTerminalLogs(prev => [...prev, '> [ERROR] Search execution failed.']);
     } finally {
       setLoading(false);
       refreshStats();
@@ -286,11 +327,18 @@ export default function HuntPage() {
                 <h3 className="font-mono text-[12px] text-on-surface font-bold">TERMINAL LOG</h3>
                 <span className="w-2 h-2 rounded bg-primary"></span>
               </div>
-              <div className="flex-1 p-3 bg-obsidian-deep font-mono text-[11px] text-on-surface-variant overflow-y-auto space-y-1 terminal-scroll">
-                <div className="opacity-50">&gt; initialize_hunter_agent(query=&quot;{query}&quot;)</div>
-                {loading && <div className="text-secondary">&gt; [WORKING] Calling Google Places API...</div>}
-                {!loading && results.length > 0 && <div className="text-primary">&gt; [SUCCESS] Extracted {results.length} new profiles.</div>}
-                <div className="animate-pulse">&gt; _</div>
+              <div className="flex-1 p-3 bg-obsidian-deep font-mono text-[11px] text-on-surface-variant overflow-y-auto space-y-1 terminal-scroll flex flex-col justify-end">
+                <div>
+                  {terminalLogs.map((log, i) => (
+                    <div 
+                      key={i} 
+                      className={log.includes('[ERROR]') ? 'text-error' : log.includes('[SUCCESS]') || log.includes('[LLM]') ? 'text-primary' : 'text-on-surface-variant'}
+                    >
+                      {log}
+                    </div>
+                  ))}
+                  <div className="animate-pulse">&gt; _</div>
+                </div>
               </div>
             </div>
           </div>

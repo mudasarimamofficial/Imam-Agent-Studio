@@ -1,9 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import { TopNav } from '@/components/layout/TopNav';
 import { Search, Cpu, X, Database, Filter } from 'lucide-react';
 import { MemoryEntry } from '@/lib/types';
+
+const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { ssr: false });
 
 const PALETTE = ['#a3e635', '#7cc0ff', '#8b8cf8', '#bef264', '#fbbf24', '#f87171'];
 
@@ -12,6 +15,18 @@ export default function MemoryPage() {
   const [selectedMemory, setSelectedMemory] = useState<MemoryEntry | null>(null);
   const [search, setSearch] = useState("");
   const [activeAgent, setActiveAgent] = useState<string | null>(null);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      setDimensions({ width: entries[0].contentRect.width, height: entries[0].contentRect.height });
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   const fetchMemory = useCallback(async () => {
     try {
@@ -48,12 +63,16 @@ export default function MemoryPage() {
 
   const filtered = activeAgent ? memories.filter((m) => m.agent_label === activeAgent) : memories;
 
-  const nodePositions = useMemo(() => {
-    const cx = 400, cy = 300, radius = 200;
-    return agents.map((a, i) => {
-      const angle = (i / Math.max(agents.length, 1)) * Math.PI * 2 - Math.PI / 2;
-      return { ...a, x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle), r: Math.min(14 + a.count * 2, 34) };
+  const graphData = useMemo(() => {
+    const nodes: any[] = [{ id: 'core', label: 'CORE', count: 100, color: '#a3e635', isCore: true }];
+    const links: any[] = [];
+    
+    agents.forEach((a) => {
+      nodes.push({ id: a.label, label: a.label, count: a.count, color: a.color });
+      links.push({ source: 'core', target: a.label });
     });
+
+    return { nodes, links };
   }, [agents]);
 
   return (
@@ -70,7 +89,7 @@ export default function MemoryPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full bg-surface-dim border border-cyber-border rounded focus:border-primary font-mono text-[13px] text-on-surface pl-9 pr-3 py-2 placeholder-on-surface-variant/50 outline-none"
-                placeholder="Search memory content..."
+                placeholder="Search semantic memory..."
                 type="text"
               />
             </div>
@@ -93,8 +112,8 @@ export default function MemoryPage() {
               <span className="ml-auto text-on-surface-variant">{filtered.length}</span>
             </div>
             {filtered.length === 0 ? (
-              <span className="text-on-surface-variant/50 italic px-2 mt-2">{search ? 'No matches.' : 'No memories yet.'}</span>
-            ) : filtered.map((mem) => (
+              <span className="text-on-surface-variant/50 italic px-2 mt-2">{search ? 'No semantic matches.' : 'No memories yet.'}</span>
+            ) : filtered.map((mem: any) => (
               <button
                 key={mem.id}
                 onClick={() => setSelectedMemory(mem)}
@@ -105,45 +124,80 @@ export default function MemoryPage() {
                   <span className="truncate">{mem.agent_label}</span>
                   <span className="ml-auto text-[9px] uppercase text-on-surface-variant">{mem.type}</span>
                 </div>
-                <span className="text-[10px] text-on-surface-variant truncate pl-5 opacity-70">{mem.content}</span>
+                <div className="flex justify-between w-full">
+                  <span className="text-[10px] text-on-surface-variant truncate pl-5 opacity-70 flex-1">{mem.content}</span>
+                  {mem.similarity && (
+                    <span className="text-[9px] text-telemetry-blue font-bold">
+                      {(mem.similarity * 100).toFixed(1)}%
+                    </span>
+                  )}
+                </div>
               </button>
             ))}
           </div>
         </aside>
 
         {/* Center: interactive graph */}
-        <section className="flex-1 glass-panel rounded-xl relative overflow-hidden flex items-center justify-center">
-          <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px)", backgroundSize: "24px 24px" }}></div>
+        <section className="flex-1 glass-panel rounded-xl relative overflow-hidden flex items-center justify-center bg-obsidian-deep" ref={containerRef}>
+          <div className="absolute inset-0 z-0 opacity-30" style={{ backgroundImage: "radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px)", backgroundSize: "24px 24px" }}></div>
 
           <div className="absolute top-4 left-4 z-20 font-mono text-[11px] text-on-surface-variant">
-            <div className="text-on-surface font-bold mb-0.5">Knowledge Graph</div>
+            <div className="text-on-surface font-bold mb-0.5 flex items-center gap-2">
+              <Database size={12} className="text-telemetry-blue" />
+              Vector Knowledge Graph
+            </div>
             <div>{agents.length} sources · {memories.length} memories</div>
             <div className="text-on-surface-variant/60 mt-1">Click a node to filter the stream</div>
           </div>
 
-          <svg className="w-full h-full relative z-10" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid meet">
-            {nodePositions.map((n) => (
-              <line key={`l-${n.label}`} x1="400" y1="300" x2={n.x} y2={n.y}
-                stroke={activeAgent === n.label ? n.color : 'rgba(255,255,255,0.08)'} strokeWidth={activeAgent === n.label ? 2 : 1} />
-            ))}
+          <div className="absolute inset-0 z-10 flex items-center justify-center">
+            {graphData.nodes.length > 1 && (
+              <ForceGraph2D
+                width={dimensions.width}
+                height={dimensions.height}
+                graphData={graphData}
+                backgroundColor="transparent"
+                linkColor={() => 'rgba(255, 255, 255, 0.08)'}
+                onNodeClick={(node: any) => {
+                  if (node.isCore) {
+                    setActiveAgent(null);
+                  } else {
+                    setActiveAgent(activeAgent === node.id ? null : node.id);
+                  }
+                }}
+                nodeCanvasObject={(node: any, ctx, globalScale) => {
+                  const label = node.label;
+                  const fontSize = 10 / globalScale;
+                  ctx.font = `bold ${fontSize}px "JetBrains Mono", monospace`;
+                  
+                  const isCore = node.isCore;
+                  const isActive = activeAgent === node.id || (!activeAgent && isCore);
+                  
+                  const radius = isCore ? 12 : Math.min(4 + node.count * 0.5, 12);
+                  
+                  ctx.beginPath();
+                  ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI, false);
+                  ctx.fillStyle = isActive ? node.color : 'rgba(20,24,30,0.9)';
+                  ctx.fill();
+                  ctx.lineWidth = 1;
+                  ctx.strokeStyle = node.color;
+                  ctx.stroke();
 
-            {/* Core */}
-            <g>
-              <circle cx="400" cy="300" r="26" fill="rgba(163,230,53,0.12)" stroke="#a3e635" strokeWidth="2" />
-              <text x="400" y="304" textAnchor="middle" fill="#bef264" fontFamily="JetBrains Mono" fontSize="10">CORE</text>
-            </g>
-
-            {nodePositions.map((n) => (
-              <g key={n.label} className="cursor-pointer" onClick={() => setActiveAgent(activeAgent === n.label ? null : n.label)}>
-                <circle cx={n.x} cy={n.y} r={n.r}
-                  fill={activeAgent === n.label ? n.color : 'rgba(20,24,30,0.9)'}
-                  stroke={n.color} strokeWidth="2"
-                  style={{ transition: 'all 0.2s' }} />
-                <text x={n.x} y={n.y + 4} textAnchor="middle" fill={activeAgent === n.label ? '#08090b' : '#f2f4f6'} fontFamily="JetBrains Mono" fontSize="10" fontWeight="bold">{n.count}</text>
-                <text x={n.x} y={n.y + n.r + 14} textAnchor="middle" fill="#aab3bf" fontFamily="JetBrains Mono" fontSize="9">{n.label.length > 16 ? n.label.slice(0, 15) + '…' : n.label}</text>
-              </g>
-            ))}
-          </svg>
+                  ctx.textAlign = 'center';
+                  ctx.textBaseline = 'middle';
+                  ctx.fillStyle = isActive ? '#08090b' : '#f2f4f6';
+                  
+                  if (isCore) {
+                    ctx.fillText('CORE', node.x, node.y);
+                  } else {
+                    ctx.fillText(node.count.toString(), node.x, node.y);
+                    ctx.fillStyle = '#aab3bf';
+                    ctx.fillText(label, node.x, node.y + radius + fontSize + 2);
+                  }
+                }}
+              />
+            )}
+          </div>
         </section>
 
         {/* Right: detail */}
@@ -171,6 +225,14 @@ export default function MemoryPage() {
                     <span className="text-on-surface-variant/70">Timestamp</span>
                     <span className="text-on-surface">{new Date(selectedMemory.created_at).toLocaleString()}</span>
                   </div>
+                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                  {(selectedMemory as any).similarity && (
+                    <div className="flex justify-between border-b border-cyber-border/30 pb-1">
+                      <span className="text-on-surface-variant/70">Semantic Match</span>
+                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                      <span className="text-telemetry-blue font-bold">{((selectedMemory as any).similarity * 100).toFixed(1)}%</span>
+                    </div>
+                  )}
                 </div>
               </div>
               <div>

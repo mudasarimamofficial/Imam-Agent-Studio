@@ -1,19 +1,39 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { TopNav } from '@/components/layout/TopNav';
+import {
+  ReactFlow,
+  MiniMap,
+  Controls,
+  Background,
+  useNodesState,
+  useEdgesState,
+  addEdge,
+  Connection,
+  Edge,
+  Node,
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
+
 import {
   Database,
   Cpu,
   Wrench,
   Globe,
-  FileText,
   Play,
   Square,
   Eye,
 } from 'lucide-react';
+import { LLMNode, MemoryNode, ToolNode, APINode } from '@/components/nodes/WorkflowNodes';
 
-// The four node types the engine can actually execute (lib/workflow/engine.ts).
+const nodeTypes = {
+  llm: LLMNode,
+  memory: MemoryNode,
+  tool: ToolNode,
+  api: APINode,
+};
+
 const NODE_LIBRARY = [
   { type: 'llm', label: 'LLM Reasoner', icon: Cpu, model: 'Gemini / Llama (hybrid router)', accent: 'text-primary', desc: 'Routes a prompt through the weighted Gemini/NVIDIA router.' },
   { type: 'memory', label: 'Memory Recall', icon: Database, model: 'Supabase keyword search', accent: 'text-telemetry-blue', desc: 'Searches your persisted memory store for matching context.' },
@@ -21,21 +41,57 @@ const NODE_LIBRARY = [
   { type: 'api', label: 'API Fetch', icon: Globe, model: 'Guarded HTTP GET', accent: 'text-agent-active-glow', desc: 'Fetches a public URL (SSRF-guarded, 15s timeout).' },
 ];
 
-// Mirrors the live TEST RUN pipeline below, node-for-node.
-const PIPELINE = [
-  { id: 'recall', type: 'memory', title: 'Memory Recall', icon: Database, model: 'Supabase search', detail: 'Pulls prior context matching "agent".' },
-  { id: 'reason', type: 'llm', title: 'LLM Reasoner', icon: Cpu, model: 'Gemini / Llama', detail: 'Drafts a short technical summary from context.' },
-  { id: 'review', type: 'llm', title: 'LLM Reviewer', icon: FileText, model: 'Gemini / Llama', detail: 'Tightens and reviews the draft.' },
+const initialNodes: Node[] = [
+  {
+    id: 'recall',
+    type: 'memory',
+    position: { x: 50, y: 150 },
+    data: { label: 'Memory Recall', model: 'Supabase search', detail: 'Pulls prior context matching "agent".' },
+  },
+  {
+    id: 'reason',
+    type: 'llm',
+    position: { x: 400, y: 150 },
+    data: { label: 'LLM Reasoner', model: 'Gemini / Llama', detail: 'Drafts a short technical summary from context.' },
+  },
+  {
+    id: 'review',
+    type: 'llm',
+    position: { x: 750, y: 150 },
+    data: { label: 'LLM Reviewer', model: 'Gemini / Llama', detail: 'Tightens and reviews the draft.' },
+  },
+];
+
+const initialEdges: Edge[] = [
+  { id: 'e-recall-reason', source: 'recall', target: 'reason', animated: true, style: { stroke: '#a3e635' } },
+  { id: 'e-reason-review', source: 'reason', target: 'review', animated: true, style: { stroke: '#a3e635' } },
 ];
 
 export default function WorkflowPage() {
   const [running, setRunning] = useState(false);
   const [workflowStatus, setWorkflowStatus] = useState<string | null>(null);
 
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
+
+  const onConnect = useCallback(
+    (params: Connection | Edge) => setEdges((eds) => addEdge({ ...params, animated: true, style: { stroke: '#a3e635' } } as Edge, eds)),
+    [setEdges],
+  );
+
   const executeWorkflow = async () => {
     if (running) return;
     setRunning(true);
     setWorkflowStatus("Booting engine...");
+
+    // Serialize the graph state
+    const serializedNodes = nodes.map(n => ({
+      id: n.id,
+      type: n.type,
+      input: n.data.detail,
+      output: '',
+      status: 'pending'
+    }));
 
     try {
       const res = await fetch('/api/workflow', {
@@ -43,11 +99,8 @@ export default function WorkflowPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: "Orchestration_Alpha_01",
-          nodes: [
-            { id: 'recall', type: 'memory', input: 'agent', output: '', status: 'pending' },
-            { id: 'reason', type: 'llm', input: 'Draft a concise technical summary from the prior context.', output: '', status: 'pending' },
-            { id: 'review', type: 'llm', input: 'Review and tighten the draft into 2 sentences.', output: '', status: 'pending' },
-          ]
+          nodes: serializedNodes,
+          edges: edges.map(e => ({ source: e.source, target: e.target }))
         })
       });
       const data = await res.json();
@@ -74,7 +127,7 @@ export default function WorkflowPage() {
         <aside className="w-72 glass-panel border-r border-cyber-border flex flex-col h-full z-20 shrink-0">
           <div className="p-4 border-b border-cyber-border">
             <h2 className="font-bold text-on-surface text-xl mb-1">Node Library</h2>
-            <p className="font-mono text-[12px] text-on-surface-variant">4 executable node types</p>
+            <p className="font-mono text-[12px] text-on-surface-variant">Drag disabled in this view</p>
           </div>
           <div className="p-3 space-y-2 overflow-y-auto terminal-scroll">
             {NODE_LIBRARY.map((n) => {
@@ -98,19 +151,14 @@ export default function WorkflowPage() {
         </aside>
 
         {/* Pipeline Canvas */}
-        <section className="flex-1 bg-obsidian-deep relative overflow-hidden">
-          <div className="absolute inset-0" style={{
-            backgroundImage: "linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px)",
-            backgroundSize: "24px 24px"
-          }}></div>
-
+        <section className="flex-1 relative overflow-hidden bg-obsidian-deep">
           {/* Toolbar */}
           <div className="absolute top-4 left-4 right-4 z-30 flex justify-between items-start gap-3">
             <div className="glass-panel rounded-lg p-2 flex items-center gap-3">
               <div className="flex flex-col px-2">
                 <span className="text-sm font-semibold text-on-surface">Orchestration_Alpha_01</span>
                 <span className="text-[11px] font-mono text-on-surface-variant flex items-center gap-1">
-                  <Eye size={11} /> Read-only viewer · TEST RUN hits the live engine
+                  <Eye size={11} /> Interactive DAG Canvas
                 </span>
               </div>
             </div>
@@ -132,33 +180,33 @@ export default function WorkflowPage() {
             </div>
           </div>
 
-          {/* Linear pipeline of the three real nodes */}
-          <div className="absolute inset-0 flex items-center justify-center px-8">
-            <div className="flex items-center gap-4 flex-wrap justify-center">
-              {PIPELINE.map((node, i) => {
-                const Icon = node.icon;
-                return (
-                  <div key={node.id} className="flex items-center gap-4">
-                    <div className={`w-60 glass-elevated rounded-xl p-4 ${running ? 'pulse-active' : ''}`}>
-                      <div className="flex items-center gap-2 mb-3">
-                        <div className="w-7 h-7 rounded bg-primary/15 flex items-center justify-center text-primary">
-                          <Icon size={15} />
-                        </div>
-                        <span className="text-sm font-semibold text-on-surface">{node.title}</span>
-                        <span className="ml-auto font-mono text-[9px] uppercase tracking-wider text-on-surface-variant border border-cyber-border rounded px-1.5 py-0.5">{node.type}</span>
-                      </div>
-                      <div className="font-mono text-[10px] text-on-surface-variant mb-1">MODEL / ENGINE</div>
-                      <div className="inline-block bg-surface-container-high border border-cyber-border px-2 py-0.5 rounded font-mono text-on-surface text-[11px] mb-2">{node.model}</div>
-                      <p className="text-[11px] text-on-surface-variant leading-relaxed">{node.detail}</p>
-                    </div>
-                    {i < PIPELINE.length - 1 && (
-                      <div className={`h-px w-8 ${running ? 'bg-primary' : 'bg-cyber-border'} transition-colors`} />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            nodeTypes={nodeTypes}
+            fitView
+            proOptions={{ hideAttribution: true }}
+            className="react-flow-glass"
+          >
+            <Background color="rgba(255, 255, 255, 0.05)" gap={24} size={1} />
+            <Controls className="bg-surface border-cyber-border text-on-surface fill-on-surface" />
+            <MiniMap 
+              nodeColor={(n) => {
+                switch(n.type) {
+                  case 'llm': return '#a3e635';
+                  case 'memory': return '#7cc0ff';
+                  case 'tool': return '#8b8cf8';
+                  case 'api': return '#bef264';
+                  default: return '#1a1d23';
+                }
+              }}
+              maskColor="rgba(8, 9, 11, 0.7)"
+              className="bg-surface border-cyber-border"
+            />
+          </ReactFlow>
         </section>
       </main>
     </div>

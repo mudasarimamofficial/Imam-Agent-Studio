@@ -12,6 +12,13 @@ const MODEL_OPTIONS = [
   'meta/llama-3.1-70b-instruct',
 ];
 
+const STAGES = [
+  "Provisioning secure sandbox...",
+  "Loading designated models...",
+  "Establishing A2A & MCP connections...",
+  "Finalizing deployment..."
+];
+
 function relativeTime(iso: string | null): string {
   if (!iso) return 'Never';
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -33,7 +40,7 @@ export default function AgentsPage() {
   const [spawnName, setSpawnName] = useState("");
   const [spawnRole, setSpawnRole] = useState("");
   const [spawnModel, setSpawnModel] = useState(MODEL_OPTIONS[0]);
-  const [spawning, setSpawning] = useState(false);
+  const [spawnStage, setSpawnStage] = useState<number>(-1);
   const [spawnError, setSpawnError] = useState<string | null>(null);
 
   async function fetchAgents() {
@@ -67,29 +74,39 @@ export default function AgentsPage() {
   }, []);
 
   const handleSpawn = async () => {
-    if (spawning || !spawnName.trim()) return;
-    setSpawning(true);
+    if (spawnStage >= 0 || !spawnName.trim()) return;
     setSpawnError(null);
+    setSpawnStage(0);
+    
     try {
+      // Simulate staging for visual feedback (provisioning pipeline)
+      for (let i = 1; i < STAGES.length; i++) {
+        await new Promise(r => setTimeout(r, 600));
+        setSpawnStage(i);
+      }
+
       const res = await fetch('/api/agents', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: spawnName.trim(), role: spawnRole.trim(), model: spawnModel }),
       });
       const json = await res.json();
+      
       if (!json.success) {
         setSpawnError(json.error?.message || 'Failed to spawn agent');
+        setSpawnStage(-1);
       } else {
+        await new Promise(r => setTimeout(r, 400));
         setSpawnOpen(false);
         setSpawnName("");
         setSpawnRole("");
         setSpawnModel(MODEL_OPTIONS[0]);
+        setSpawnStage(-1);
         await fetchAgents();
       }
     } catch {
       setSpawnError('Network error while spawning agent');
-    } finally {
-      setSpawning(false);
+      setSpawnStage(-1);
     }
   };
 
@@ -107,7 +124,6 @@ export default function AgentsPage() {
   };
 
   const triggerTask = async (agentId: string) => {
-    // Optimistic UI update could be added here
     try {
       await fetch('/api/agents', {
         method: 'POST',
@@ -241,77 +257,102 @@ export default function AgentsPage() {
       {spawnOpen && (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-obsidian-deep/70 backdrop-blur-sm animate-fade-in"
-          onClick={() => !spawning && setSpawnOpen(false)}
+          onClick={() => spawnStage === -1 && setSpawnOpen(false)}
         >
           <div
-            className="glass-elevated rounded-2xl w-full max-w-md p-6 relative"
+            className="glass-elevated rounded-2xl w-full max-w-md p-6 relative overflow-hidden transition-all duration-300"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-start justify-between mb-5">
-              <div>
-                <h3 className="text-lg font-bold text-on-surface">Spawn Agent</h3>
-                <p className="font-mono text-[11px] text-on-surface-variant mt-1">Deploy a new instance to your fleet</p>
-              </div>
-              <button onClick={() => !spawning && setSpawnOpen(false)} className="text-on-surface-variant hover:text-on-surface" aria-label="Close">
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="spawn-name" className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block mb-2">Name</label>
-                <input
-                  id="spawn-name"
-                  value={spawnName}
-                  onChange={(e) => setSpawnName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSpawn()}
-                  placeholder="e.g. Research Scout"
-                  autoFocus
-                  className="w-full bg-surface-container-low border border-cyber-border rounded-lg px-3 py-2.5 text-sm text-on-surface placeholder-on-surface-variant/40 outline-none focus:border-primary/60 transition-colors"
-                />
-              </div>
-              <div>
-                <label htmlFor="spawn-role" className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block mb-2">Role <span className="opacity-50">(optional)</span></label>
-                <input
-                  id="spawn-role"
-                  value={spawnRole}
-                  onChange={(e) => setSpawnRole(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSpawn()}
-                  placeholder="e.g. Market Research"
-                  className="w-full bg-surface-container-low border border-cyber-border rounded-lg px-3 py-2.5 text-sm text-on-surface placeholder-on-surface-variant/40 outline-none focus:border-primary/60 transition-colors"
-                />
-              </div>
-              <div>
-                <label htmlFor="spawn-model" className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block mb-2">Model</label>
-                <select
-                  id="spawn-model"
-                  value={spawnModel}
-                  onChange={(e) => setSpawnModel(e.target.value)}
-                  className="w-full bg-surface-container-low border border-cyber-border rounded-lg px-3 py-2.5 text-sm text-on-surface outline-none focus:border-primary/60 transition-colors font-mono"
-                >
-                  {MODEL_OPTIONS.map((m) => <option key={m} value={m} className="bg-surface-container">{m}</option>)}
-                </select>
-              </div>
-
-              {spawnError && (
-                <div role="alert" className="text-[13px] rounded-lg px-3 py-2 border border-error/30 bg-error/10 text-error font-mono">
-                  {spawnError}
+            <div className={`transition-opacity duration-300 ${spawnStage >= 0 ? 'opacity-0 pointer-events-none absolute inset-0' : 'opacity-100 relative'}`}>
+              <div className="flex items-start justify-between mb-5">
+                <div>
+                  <h3 className="text-lg font-bold text-on-surface">Spawn Agent</h3>
+                  <p className="font-mono text-[11px] text-on-surface-variant mt-1">Deploy a new instance to your fleet</p>
                 </div>
-              )}
+                <button onClick={() => setSpawnOpen(false)} className="text-on-surface-variant hover:text-on-surface" aria-label="Close">
+                  <X size={18} />
+                </button>
+              </div>
 
-              <button
-                onClick={handleSpawn}
-                disabled={spawning || !spawnName.trim()}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-primary text-on-primary-fixed font-mono text-[13px] font-bold uppercase tracking-wider hover:brightness-110 transition-all disabled:opacity-50"
-              >
-                {spawning ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-                {spawning ? 'Spawning...' : 'Deploy Agent'}
-              </button>
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="spawn-name" className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block mb-2">Name</label>
+                  <input
+                    id="spawn-name"
+                    value={spawnName}
+                    onChange={(e) => setSpawnName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSpawn()}
+                    placeholder="e.g. Research Scout"
+                    autoFocus
+                    className="w-full bg-surface-container-low border border-cyber-border rounded-lg px-3 py-2.5 text-sm text-on-surface placeholder-on-surface-variant/40 outline-none focus:border-primary/60 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="spawn-role" className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block mb-2">Role <span className="opacity-50">(optional)</span></label>
+                  <input
+                    id="spawn-role"
+                    value={spawnRole}
+                    onChange={(e) => setSpawnRole(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSpawn()}
+                    placeholder="e.g. Market Research"
+                    className="w-full bg-surface-container-low border border-cyber-border rounded-lg px-3 py-2.5 text-sm text-on-surface placeholder-on-surface-variant/40 outline-none focus:border-primary/60 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="spawn-model" className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block mb-2">Model</label>
+                  <select
+                    id="spawn-model"
+                    value={spawnModel}
+                    onChange={(e) => setSpawnModel(e.target.value)}
+                    className="w-full bg-surface-container-low border border-cyber-border rounded-lg px-3 py-2.5 text-sm text-on-surface outline-none focus:border-primary/60 transition-colors font-mono"
+                  >
+                    {MODEL_OPTIONS.map((m) => <option key={m} value={m} className="bg-surface-container">{m}</option>)}
+                  </select>
+                </div>
+
+                {spawnError && (
+                  <div role="alert" className="text-[13px] rounded-lg px-3 py-2 border border-error/30 bg-error/10 text-error font-mono">
+                    {spawnError}
+                  </div>
+                )}
+
+                <button
+                  onClick={handleSpawn}
+                  disabled={!spawnName.trim()}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-primary text-on-primary-fixed font-mono text-[13px] font-bold uppercase tracking-wider hover:brightness-110 transition-all disabled:opacity-50 mt-2"
+                >
+                  <Plus size={16} />
+                  Deploy Agent
+                </button>
+              </div>
             </div>
+
+            {/* Staging Overlay */}
+            {spawnStage >= 0 && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-6 bg-surface/90 backdrop-blur-md animate-fade-in text-center">
+                <div className="relative mb-6">
+                  <div className="w-16 h-16 border-2 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Database size={20} className="text-primary animate-pulse" />
+                  </div>
+                </div>
+                <h3 className="font-mono text-sm text-primary uppercase tracking-widest mb-2">Agent Provisioning</h3>
+                <div className="h-6 overflow-hidden">
+                  <p key={spawnStage} className="font-mono text-[11px] text-on-surface-variant animate-slide-up">
+                    {STAGES[spawnStage]}
+                  </p>
+                </div>
+                <div className="w-full bg-surface-border h-1 rounded-full mt-4 overflow-hidden">
+                  <div 
+                    className="h-full bg-primary transition-all duration-500 ease-out" 
+                    style={{ width: `${((spawnStage + 1) / STAGES.length) * 100}%` }}
+                  ></div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
     </div>
   );
 }
-

@@ -11,7 +11,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: false, error: { message: "Unauthorized" } }, { status: 401 });
   }
 
-  // Pitch generation is an LLM call — rate-limit it like other inference routes.
   const rl = checkRateLimit(user.id, 'pitch', 8);
   if (!rl.allowed) {
     return NextResponse.json(
@@ -20,17 +19,44 @@ export async function POST(req: Request) {
     );
   }
 
+  let body: any;
   try {
-    const { business_name, category, location, rating, website_uri, score } = await req.json();
-    if (!business_name || typeof business_name !== 'string') {
-      return NextResponse.json({ success: false, error: { message: "business_name is required" } }, { status: 400 });
-    }
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ success: false, error: { message: "Invalid JSON" } }, { status: 400 });
+  }
 
-    const hasWebsite = website_uri && website_uri !== 'No website found';
-    const settings = await getUserSettings(supabase);
-    const secrets = await getUserSecrets(supabase);
+  const { business_name, category, location, rating, website_uri, score } = body;
+  if (!business_name || typeof business_name !== 'string') {
+    return NextResponse.json({ success: false, error: { message: "business_name is required" } }, { status: 400 });
+  }
 
-    const prompt = `Write a concise, personalized cold outreach email to a prospective client.
+  const stream = new ReadableStream({
+    async start(controller) {
+      const sendLog = (msg: string) => {
+        controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: 'log', msg })}\n\n`));
+      };
+      const sendResult = (pitch: string, model_used: string) => {
+        controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: 'result', pitch, model_used })}\n\n`));
+      };
+      const sendError = (msg: string) => {
+        controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: 'error', msg })}\n\n`));
+      };
+
+      try {
+        sendLog(`[SYS] Initializing sequence for target: ${business_name}...`);
+        await new Promise(r => setTimeout(r, 400));
+        
+        sendLog("[SYS] Analyzing lead data...");
+        const settings = await getUserSettings(supabase);
+        const secrets = await getUserSecrets(supabase);
+        await new Promise(r => setTimeout(r, 400));
+
+        const hasWebsite = website_uri && website_uri !== 'No website found';
+        sendLog(`[SYS] Target context: ${category} in ${location}. Web presence: ${hasWebsite ? 'VERIFIED' : 'NONE'}`);
+        await new Promise(r => setTimeout(r, 400));
+
+        const prompt = `Write a concise, personalized cold outreach email to a prospective client.
 
 Business: ${business_name}
 Category: ${String(category || 'business').replace(/_/g, ' ')}
@@ -47,29 +73,47 @@ Guidelines:
 - End with a soft call to action (a short call).
 - Output ONLY the email body with a subject line. No preamble.`;
 
-    const out = await routeAI(
-      {
-        taskType: 'fast_action',
-        systemInstruction: 'You are an expert B2B sales copywriter. You write tight, high-converting, non-spammy outreach.',
-        messages: [{ role: 'user', content: prompt }],
-      },
-      { gemini: settings.routing_weight_gemini, nvidia: settings.routing_weight_nvidia },
-      { gemini: secrets.gemini, nvidia: secrets.nvidia }
-    );
+        sendLog("[LLM] Crafting hyper-personalized outreach...");
+        
+        const out = await routeAI(
+          {
+            taskType: 'fast_action',
+            systemInstruction: 'You are an expert B2B sales copywriter. You write tight, high-converting, non-spammy outreach.',
+            messages: [{ role: 'user', content: prompt }],
+          },
+          { gemini: settings.routing_weight_gemini, nvidia: settings.routing_weight_nvidia },
+          { gemini: secrets.gemini, nvidia: secrets.nvidia }
+        );
 
-    await supabase.from("inference_events").insert({
-      user_id: user.id,
-      model_used: out.model_used,
-      task_type: out.task_type,
-      tokens_estimate: out.tokens_estimate,
-      latency_ms: out.latency_ms,
-      source: 'command',
-    });
+        sendLog(`[SYS] Pitch generation complete via ${out.model_used}. Logging event...`);
+        
+        await supabase.from("inference_events").insert({
+          user_id: user.id,
+          model_used: out.model_used,
+          task_type: out.task_type,
+          tokens_estimate: out.tokens_estimate,
+          latency_ms: out.latency_ms,
+          source: 'command',
+        });
 
-    return NextResponse.json({ success: true, data: { pitch: out.result, model_used: out.model_used } });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    await persistLog(supabase, user.id, 'error', 'pitch_api', 'Pitch generation failed', { message });
-    return NextResponse.json({ success: false, error: { message } }, { status: 500 });
-  }
+        sendResult(out.result, out.model_used);
+        sendLog("[SUCCESS] Sequence concluded.");
+      } catch (err: any) {
+        const message = err.message || "Unknown error";
+        sendError(message);
+        sendLog(`[ERROR] ${message}`);
+        await persistLog(supabase, user.id, 'error', 'pitch_api', 'Pitch generation failed', { message });
+      } finally {
+        controller.close();
+      }
+    }
+  });
+
+  return new NextResponse(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    },
+  });
 }
