@@ -8,7 +8,7 @@ const BARE_ROUTES = ['/login'];
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  if (BARE_ROUTES.some((r) => pathname.startsWith(r))) {
+  if (BARE_ROUTES.some((r) => pathname.startsWith(r)) || pathname === '/') {
     return <>{children}</>;
   }
 

@@ -17,7 +17,7 @@ import {
 import { createClient } from '@/lib/supabase/client';
 
 const NAVIGATION = [
-  { name: 'Workspace', href: '/', icon: LayoutDashboard },
+  { name: 'Workspace', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Agent Registry', href: '/agents', icon: Network },
   { name: 'Architect', href: '/workflow', icon: Workflow },
   { name: 'Memory', href: '/memory', icon: Database },
@@ -88,7 +88,11 @@ export function Sidebar() {
       </div>
 
       <div className="px-5 mt-auto pt-4">
-        <button className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded bg-primary text-on-primary-fixed font-mono text-[13px] font-bold hover:opacity-90 transition-opacity">
+        <button
+          className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded font-mono text-[13px] font-bold opacity-50 cursor-not-allowed bg-black/40 backdrop-blur-xl border border-white/10 text-on-surface shadow-none"
+          disabled
+          title="Coming Soon"
+        >
           <Plus size={16} />
           New Agent
         </button>
