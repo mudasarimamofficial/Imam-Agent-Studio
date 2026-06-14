@@ -124,6 +124,18 @@ export default function WorkflowPage() {
     setRunning(true);
     setWorkflowStatus("Booting AI Pipeline Engine... Please stand by.");
 
+    // Visually highlight nodes one by one to simulate execution path
+    let currentIdx = 0;
+    const highlightInterval = setInterval(() => {
+      setNodes((nds) => nds.map((node, i) => {
+        if (i === currentIdx % nds.length) {
+          return { ...node, style: { ...node.style, outline: '2px solid #a3e635', outlineOffset: '4px', boxShadow: '0 0 20px rgba(163, 230, 53, 0.4)', transition: 'all 0.3s' } };
+        }
+        return { ...node, style: { ...node.style, outline: 'none', boxShadow: 'none' } };
+      }));
+      currentIdx++;
+    }, 800);
+
     // Serialize the graph state
     const serializedNodes = nodes.map(n => ({
       id: n.id,
@@ -153,6 +165,8 @@ export default function WorkflowPage() {
       console.error(e);
       setWorkflowStatus("This task took too long and stopped. Tap to try again.");
     } finally {
+      clearInterval(highlightInterval);
+      setNodes((nds) => nds.map(node => ({ ...node, style: { ...node.style, outline: 'none', boxShadow: 'none' } })));
       setRunning(false);
       setTimeout(() => setWorkflowStatus(null), 6000);
     }

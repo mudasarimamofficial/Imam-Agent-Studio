@@ -275,16 +275,46 @@ export default function HuntPage() {
           {/* Middle Column */}
           <div className="md:col-span-5 flex flex-col gap-6">
             <div className="glass-panel rounded-xl flex-1 relative overflow-hidden flex flex-col">
-              <div className="p-3 border-b border-cyber-border flex justify-between items-center bg-surface/80 absolute top-0 w-full z-10">
+              <div className="p-3 border-b border-cyber-border flex justify-between items-center bg-surface/80 relative z-10">
                 <h3 className="font-mono text-[12px] text-on-surface font-bold flex items-center gap-2">
-                  <MapPin size={16} className="text-strategic-violet" />
-                  GEO_TARGET: SYSTEM ACTIVE
+                  <Radar size={16} className="text-strategic-violet" />
+                  LEAD INTELLIGENCE ENGINE
                 </h3>
-                <div className="w-2 h-2 rounded-full bg-strategic-violet animate-pulse"></div>
+                {loading ? <div className="w-2 h-2 rounded-full bg-strategic-violet animate-pulse"></div> : null}
               </div>
-              <div className="absolute inset-0 bg-surface-container-low/50">
-                <div className="absolute top-1/2 left-1/2 w-32 h-32 -translate-x-1/2 -translate-y-1/2 border border-strategic-violet/30 rounded-full animate-[ping_3s_infinite]"></div>
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-strategic-violet rounded-full shadow-[0_0_18px_-2px_var(--color-strategic-violet)]"></div>
+              <div className="flex-1 overflow-y-auto p-4 terminal-scroll relative z-10 bg-surface-container-low/30">
+                {results.length > 0 ? (
+                  <div className="space-y-4">
+                     <div className="grid grid-cols-2 gap-3">
+                       <div className="p-3 bg-surface/60 border border-cyber-border rounded">
+                         <div className="text-[10px] font-mono text-on-surface-variant mb-1">AVG. RATING</div>
+                         <div className="text-2xl font-bold text-primary">{(results.reduce((a, b) => a + Number(b.rating || 0), 0) / results.length).toFixed(1)}</div>
+                       </div>
+                       <div className="p-3 bg-surface/60 border border-cyber-border rounded">
+                         <div className="text-[10px] font-mono text-on-surface-variant mb-1">HIGH SCORE TARGETS</div>
+                         <div className="text-2xl font-bold text-strategic-violet">{results.filter(r => Number(r.score || 0) >= 70).length}</div>
+                       </div>
+                     </div>
+                     <div>
+                       <h4 className="font-mono text-[11px] text-on-surface-variant uppercase mb-2">Prime Targets</h4>
+                       {results.filter(r => Number(r.score || 0) >= 70).slice(0, 3).map((r, i) => (
+                         <div key={i} className="flex items-center justify-between py-2 border-b border-cyber-border/50 last:border-0">
+                           <div className="truncate pr-2">
+                             <div className="text-sm font-semibold text-on-surface truncate">{r.business_name}</div>
+                             <div className="text-[10px] text-on-surface-variant font-mono truncate">{r.category.replace(/_/g, ' ')}</div>
+                           </div>
+                           <button onClick={() => openLead(r)} className="px-2 py-1 bg-primary/10 text-primary rounded font-mono text-[10px] hover:bg-primary/20 shrink-0">PITCH</button>
+                         </div>
+                       ))}
+                     </div>
+                  </div>
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center opacity-50 relative">
+                    <div className="w-24 h-24 border border-strategic-violet/30 rounded-full animate-[ping_3s_infinite] absolute"></div>
+                    <Radar size={32} className="text-strategic-violet mb-2 relative z-10" />
+                    <p className="font-mono text-xs text-on-surface-variant relative z-10">Awaiting hunt query...</p>
+                  </div>
+                )}
               </div>
             </div>
 

@@ -124,16 +124,20 @@ export default function AgentsPage() {
   };
 
   const triggerTask = async (agentId: string) => {
+    const userInput = prompt("Enter a task for this Assistant:");
+    if (!userInput) return; // Cancelled or empty
     try {
       await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           agent_id: agentId,
-          instruction: "Perform a routine status check and optimize your current state.",
+          instruction: userInput,
           task_type: "fast_action"
         })
       });
+      // Optionally refresh the agents list to see active status
+      await fetchAgents();
     } catch (e) {
       console.error(e);
     }
