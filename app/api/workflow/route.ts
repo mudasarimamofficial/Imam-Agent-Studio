@@ -9,6 +9,8 @@ const VALID_NODE_TYPES = ['llm', 'api', 'memory', 'tool'];
 const MAX_NODES = 20;
 const MAX_INPUT_LENGTH = 8000;
 
+export const maxDuration = 45;
+
 export async function POST(req: Request) {
   const { supabase, user } = await getAuthenticatedUser();
   if (!user) {

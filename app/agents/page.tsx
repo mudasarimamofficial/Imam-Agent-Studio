@@ -169,7 +169,7 @@ export default function AgentsPage() {
                 <h2 className="text-xl font-bold font-sans tracking-tight text-on-surface">Agent Deployment Roster</h2>
                 <p className="text-sm font-mono text-on-surface-variant flex items-center gap-2 mt-1">
                   <Activity size={14} className="text-primary animate-pulse" />
-                  Fleet Capacity: {agents.length}{capacityLimit !== null ? `/${capacityLimit}` : ''} Instances · {agents.filter(a => a.status === 'running').length} running
+                  Team Capacity: {agents.length}{capacityLimit !== null ? `/${capacityLimit}` : ''} Instances · {agents.filter(a => a.status === 'running').length} running
                 </p>
               </div>
               <button
@@ -177,7 +177,7 @@ export default function AgentsPage() {
                 className="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary-fixed hover:brightness-110 rounded-md font-mono text-xs uppercase tracking-wider transition-all"
               >
                 <Plus size={14} />
-                Spawn Agent
+                Create Assistant
               </button>
             </div>
 
@@ -266,7 +266,7 @@ export default function AgentsPage() {
             <div className={`transition-opacity duration-300 ${spawnStage >= 0 ? 'opacity-0 pointer-events-none absolute inset-0' : 'opacity-100 relative'}`}>
               <div className="flex items-start justify-between mb-5">
                 <div>
-                  <h3 className="text-lg font-bold text-on-surface">Spawn Agent</h3>
+                  <h3 className="text-lg font-bold text-on-surface">Create Assistant</h3>
                   <p className="font-mono text-[11px] text-on-surface-variant mt-1">Deploy a new instance to your fleet</p>
                 </div>
                 <button onClick={() => setSpawnOpen(false)} className="text-on-surface-variant hover:text-on-surface" aria-label="Close">
@@ -322,7 +322,7 @@ export default function AgentsPage() {
                   className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-primary text-on-primary-fixed font-mono text-[13px] font-bold uppercase tracking-wider hover:brightness-110 transition-all disabled:opacity-50 mt-2"
                 >
                   <Plus size={16} />
-                  Deploy Agent
+                  Add Digital Worker
                 </button>
               </div>
             </div>

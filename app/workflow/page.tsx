@@ -35,10 +35,10 @@ const nodeTypes = {
 };
 
 const NODE_LIBRARY = [
-  { type: 'llm', label: 'LLM Reasoner', icon: Cpu, model: 'Gemini / Llama (hybrid router)', accent: 'text-primary', desc: 'Routes a prompt through the weighted Gemini/NVIDIA router.' },
-  { type: 'memory', label: 'Memory Recall', icon: Database, model: 'Supabase keyword search', accent: 'text-telemetry-blue', desc: 'Searches your persisted memory store for matching context.' },
-  { type: 'tool', label: 'Tool Runner', icon: Wrench, model: 'Sandboxed registry', accent: 'text-strategic-violet', desc: 'Runs a sandboxed tool: calc, timestamp, echo, uppercase, word_count.' },
-  { type: 'api', label: 'API Fetch', icon: Globe, model: 'Guarded HTTP GET', accent: 'text-agent-active-glow', desc: 'Fetches a public URL (SSRF-guarded, 15s timeout).' },
+  { type: 'llm', label: 'AI Writer / Thinker', icon: Cpu, model: 'Gemini / Llama (hybrid router)', accent: 'text-primary', desc: 'Routes a prompt through the weighted Gemini/NVIDIA router.' },
+  { type: 'memory', label: 'Recall Past Work', icon: Database, model: 'Supabase keyword search', accent: 'text-telemetry-blue', desc: 'Searches your persisted memory store for matching context.' },
+  { type: 'tool', label: 'Run Action', icon: Wrench, model: 'Sandboxed registry', accent: 'text-strategic-violet', desc: 'Runs a sandboxed tool: calc, timestamp, echo, uppercase, word_count.' },
+  { type: 'api', label: 'Fetch Data', icon: Globe, model: 'Guarded HTTP GET', accent: 'text-agent-active-glow', desc: 'Fetches a public URL (SSRF-guarded, 15s timeout).' },
 ];
 
 const initialNodes: Node[] = [
@@ -46,19 +46,19 @@ const initialNodes: Node[] = [
     id: 'recall',
     type: 'memory',
     position: { x: 50, y: 150 },
-    data: { label: 'Memory Recall', model: 'Supabase search', detail: 'Pulls prior context matching "agent".' },
+    data: { label: 'Recall Past Work', model: 'Supabase search', detail: 'Pulls prior context matching "agent".' },
   },
   {
     id: 'reason',
     type: 'llm',
     position: { x: 400, y: 150 },
-    data: { label: 'LLM Reasoner', model: 'Gemini / Llama', detail: 'Drafts a short technical summary from context.' },
+    data: { label: 'AI Writer / Thinker', model: 'Gemini / Llama', detail: 'Drafts a short technical summary from context.' },
   },
   {
     id: 'review',
     type: 'llm',
     position: { x: 750, y: 150 },
-    data: { label: 'LLM Reviewer', model: 'Gemini / Llama', detail: 'Tightens and reviews the draft.' },
+    data: { label: 'AI Writer / Thinker', model: 'Gemini / Llama', detail: 'Tightens and reviews the draft.' },
   },
 ];
 
@@ -82,7 +82,7 @@ export default function WorkflowPage() {
   const executeWorkflow = async () => {
     if (running) return;
     setRunning(true);
-    setWorkflowStatus("Booting engine...");
+    setWorkflowStatus("Booting AI Pipeline Engine... Please stand by.");
 
     // Serialize the graph state
     const serializedNodes = nodes.map(n => ({
@@ -111,7 +111,7 @@ export default function WorkflowPage() {
       }
     } catch (e) {
       console.error(e);
-      setWorkflowStatus("System exception");
+      setWorkflowStatus("This task took too long and stopped. Tap to try again.");
     } finally {
       setRunning(false);
       setTimeout(() => setWorkflowStatus(null), 6000);
@@ -120,7 +120,7 @@ export default function WorkflowPage() {
 
   return (
     <div className="flex-1 flex flex-col h-full relative overflow-hidden bg-background">
-      <TopNav title="Architect" tabs={['Pipeline Viewer']} activeTab="Pipeline Viewer" />
+      <TopNav title="Workflow Automation" tabs={['Pipeline Viewer']} activeTab="Pipeline Viewer" />
 
       <main className="flex-1 flex overflow-hidden">
         {/* Node Library */}

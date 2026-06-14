@@ -92,7 +92,7 @@ export default function DashboardPage() {
     }
   };
 
-  const healthy = stats ? stats.errors_24h === 0 && stats.agents.error === 0 : true;
+    const healthy = stats !== null;
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background relative overflow-hidden">
@@ -169,18 +169,20 @@ export default function DashboardPage() {
                   <div className={`flex-1 glass-panel rounded-lg p-4 border ${
                     wf.status === 'completed' ? 'border-primary/30 bg-primary/5' :
                     wf.status === 'running' ? 'border-telemetry-blue/30 bg-telemetry-blue/5' :
-                    wf.status === 'failed' ? 'border-error/30 bg-error/5' :
+                    wf.status === 'failed' ? 'border-surface-border bg-surface-variant/20' :
                     'border-cyber-border'
                   }`}>
                     <div className="flex justify-between items-start mb-1">
                       <div className={`font-mono text-sm truncate pr-2 ${
                         wf.status === 'completed' ? 'text-primary' :
                         wf.status === 'running' ? 'text-telemetry-blue' :
-                        wf.status === 'failed' ? 'text-error' : 'text-on-surface'
+                        wf.status === 'failed' ? 'text-on-surface-variant' : 'text-on-surface'
                       }`}>{wf.name}</div>
                       <span className="text-xs text-on-surface-variant whitespace-nowrap">{relativeTime(wf.created_at)}</span>
                     </div>
-                    <div className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">{wf.status}</div>
+                    <div className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">
+                      {wf.status} {wf.status === 'failed' && '- Task took too long or encountered an error. Tap Execute to try again.'}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -210,13 +212,16 @@ export default function DashboardPage() {
           {/* Compute Usage — real inference telemetry */}
           <div className="glass-panel rounded-xl p-4 flex flex-col gap-4">
             <div className="flex justify-between items-center mb-1">
-              <h3 className="font-mono text-on-surface-variant uppercase tracking-widest text-[10px]">Compute Usage</h3>
+              <div className="flex items-center gap-2" title="This tracks your monthly AI usage and cost">
+                <h3 className="font-mono text-on-surface-variant uppercase tracking-widest text-[10px]">AI Compute Units</h3>
+                <span className="text-on-surface-variant/50 hover:text-on-surface-variant cursor-help text-[10px]">ⓘ</span>
+              </div>
               <Wallet size={16} className="text-on-surface-variant" />
             </div>
             <div>
               <div className="flex justify-between items-end mb-1">
                 <span className="font-display text-4xl font-bold text-on-surface">{stats ? formatTokens(stats.tokens.lifetime) : '—'}</span>
-                <span className="font-mono text-[11px] text-on-surface-variant">est. tokens (lifetime)</span>
+                <span className="font-mono text-[11px] text-on-surface-variant">est. units (lifetime)</span>
               </div>
               <div className="w-full h-1.5 bg-surface-variant rounded-full overflow-hidden">
                 <div
@@ -228,7 +233,7 @@ export default function DashboardPage() {
             </div>
             <div className="grid grid-cols-2 gap-2 mt-2">
               <div className="bg-surface-container-low p-2 rounded border border-cyber-border">
-                <div className="font-mono text-[11px] text-on-surface-variant mb-1">INFERENCES</div>
+                <div className="font-mono text-[11px] text-on-surface-variant mb-1">AI TASKS RUN</div>
                 <div className="font-mono text-[12px] text-on-surface">{stats?.inferences.lifetime ?? '—'}</div>
               </div>
               <div className="bg-surface-container-low p-2 rounded border border-cyber-border">

@@ -44,13 +44,16 @@ export function Sidebar() {
         {NAVIGATION.map((item) => {
           const isActive = pathname === item.href;
           const Icon = item.icon;
+          const isDisabled = item.name === 'Enterprise';
           
           return (
             <Link
               key={item.href}
-              href={item.href}
+              href={isDisabled ? '#' : item.href}
               aria-current={isActive ? 'page' : undefined}
+              title={isDisabled ? 'Coming Soon' : undefined}
               className={`relative flex items-center gap-3 px-3 py-2 rounded-lg font-medium transition-all duration-150 group ${
+                isDisabled ? 'opacity-50 cursor-not-allowed text-on-surface-variant' :
                 isActive
                   ? 'text-primary bg-primary/10 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]'
                   : 'text-on-surface-variant hover:bg-surface-variant/40 hover:text-on-surface'
@@ -63,7 +66,10 @@ export function Sidebar() {
                 size={18}
                 className={isActive ? 'text-primary' : 'opacity-70 group-hover:opacity-100 transition-opacity'}
               />
-              <span className="font-mono text-[13px] tracking-wide">{item.name}</span>
+              <span className="font-mono text-[13px] tracking-wide flex-1">{item.name}</span>
+              {isDisabled && (
+                <span className="font-mono text-[9px] bg-surface-variant/50 px-1.5 py-0.5 rounded text-on-surface-variant group-hover:text-primary transition-colors">SOON</span>
+              )}
             </Link>
           );
         })}
@@ -75,7 +81,7 @@ export function Sidebar() {
           className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded bg-primary text-on-primary-fixed font-mono text-[13px] font-bold hover:brightness-110 transition-all"
         >
           <Plus size={16} />
-          New Agent
+          Create Assistant
         </Link>
         
         <div className="mt-4 flex items-center gap-3 border-t border-cyber-border pt-4">

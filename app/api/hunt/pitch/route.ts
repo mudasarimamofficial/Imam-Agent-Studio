@@ -5,6 +5,8 @@ import { getUserSettings, getUserSecrets } from '@/lib/settings';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { persistLog } from '@/lib/logger';
 
+export const maxDuration = 45;
+
 export async function POST(req: Request) {
   const { supabase, user } = await getAuthenticatedUser();
   if (!user) {
