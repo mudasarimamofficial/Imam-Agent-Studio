@@ -145,6 +145,32 @@ export default function HuntPage() {
     }
   };
 
+  const exportToCSV = () => {
+    if (results.length === 0) return;
+    const headers = ['Name', 'Score', 'Address', 'Website', 'Rating'];
+    const csvRows = [headers.join(',')];
+    
+    for (const r of results) {
+      const name = `"${r.business_name.replace(/"/g, '""')}"`;
+      const score = r.score ?? 0;
+      const address = `"${r.location.replace(/"/g, '""')}"`;
+      const website = `"${(r.website_uri && r.website_uri !== 'No website found') ? r.website_uri : ''}"`;
+      const rating = r.rating ?? 0;
+      csvRows.push([name, score, address, website, rating].join(','));
+    }
+    
+    const csvString = csvRows.join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `leads_export_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full bg-background relative overflow-hidden">
       <TopNav 
@@ -191,7 +217,14 @@ export default function HuntPage() {
                 <Radar size={16} className="text-secondary" />
                 LIVE HUNT FEED
               </h3>
-              <span className="font-mono text-[11px] text-on-surface-variant">{loading ? 'SCRAPING_ACTIVE' : 'IDLE'}</span>
+              <div className="flex items-center gap-3">
+                <span className="font-mono text-[11px] text-on-surface-variant">{loading ? 'SCRAPING_ACTIVE' : 'IDLE'}</span>
+                {results.length > 0 && (
+                  <button onClick={exportToCSV} className="px-2 py-1 bg-surface-elevated hover:bg-surface-border text-on-surface text-[10px] rounded font-mono uppercase tracking-widest border border-cyber-border transition-colors">
+                    Export CSV
+                  </button>
+                )}
+              </div>
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-3 data-stream relative terminal-scroll">
               

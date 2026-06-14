@@ -74,10 +74,50 @@ export default function WorkflowPage() {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
 
+  const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
+
   const onConnect = useCallback(
     (params: Connection | Edge) => setEdges((eds) => addEdge({ ...params, animated: true, style: { stroke: '#a3e635' } } as Edge, eds)),
     [setEdges],
   );
+
+  const onDragOver = useCallback((event: any) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  const onDrop = useCallback(
+    (event: any) => {
+      event.preventDefault();
+
+      const type = event.dataTransfer.getData('application/reactflow');
+      if (typeof type === 'undefined' || !type || !reactFlowInstance) {
+        return;
+      }
+
+      const position = reactFlowInstance.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+      
+      const libraryNode = NODE_LIBRARY.find(n => n.type === type);
+
+      const newNode = {
+        id: `${type}_${Date.now()}`,
+        type,
+        position,
+        data: { label: libraryNode?.label || type, detail: 'Configure node parameters' },
+      };
+
+      setNodes((nds) => nds.concat(newNode));
+    },
+    [reactFlowInstance, setNodes]
+  );
+
+  const onDragStart = (event: any, nodeType: string) => {
+    event.dataTransfer.setData('application/reactflow', nodeType);
+    event.dataTransfer.effectAllowed = 'move';
+  };
 
   const executeWorkflow = async () => {
     if (running) return;
@@ -127,13 +167,18 @@ export default function WorkflowPage() {
         <aside className="w-72 glass-panel border-r border-cyber-border flex flex-col h-full z-20 shrink-0">
           <div className="p-4 border-b border-cyber-border">
             <h2 className="font-bold text-on-surface text-xl mb-1">Node Library</h2>
-            <p className="font-mono text-[12px] text-on-surface-variant">Drag disabled in this view</p>
+            <p className="font-mono text-[12px] text-on-surface-variant">Drag components to the canvas</p>
           </div>
           <div className="p-3 space-y-2 overflow-y-auto terminal-scroll">
             {NODE_LIBRARY.map((n) => {
               const Icon = n.icon;
               return (
-                <div key={n.type} className="bg-surface border border-cyber-border p-3 rounded-lg hover-lift">
+                <div 
+                  key={n.type} 
+                  className="bg-surface border border-cyber-border p-3 rounded-lg hover-lift cursor-grab"
+                  draggable
+                  onDragStart={(e) => onDragStart(e, n.type)}
+                >
                   <div className="flex items-center gap-3 mb-2">
                     <div className={`w-8 h-8 rounded bg-surface-bright flex items-center justify-center ${n.accent}`}>
                       <Icon size={18} />
@@ -186,6 +231,9 @@ export default function WorkflowPage() {
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            onInit={setReactFlowInstance}
+            onDrop={onDrop}
+            onDragOver={onDragOver}
             nodeTypes={nodeTypes}
             fitView
             proOptions={{ hideAttribution: true }}
@@ -207,6 +255,19 @@ export default function WorkflowPage() {
               className="bg-surface border-cyber-border"
             />
           </ReactFlow>
+
+          {nodes.length === 0 && (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none">
+              <div className="glass-panel p-12 rounded-2xl border border-primary/20 text-center max-w-md animate-fade-in flex flex-col items-center relative overflow-hidden pointer-events-auto shadow-[0_0_40px_rgba(var(--primary-rgb),0.1)]">
+                <div className="absolute inset-0 bg-primary/5 pulse-active pointer-events-none"></div>
+                <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-6 relative z-10">
+                  <Wrench size={40} className="text-primary" />
+                </div>
+                <h3 className="text-2xl font-bold text-on-surface mb-3 relative z-10">Blank Canvas</h3>
+                <p className="text-on-surface-variant text-sm relative z-10">You haven't added any AI actions yet. Drag a node from the library to start building your automated workflow.</p>
+              </div>
+            </div>
+          )}
         </section>
       </main>
     </div>

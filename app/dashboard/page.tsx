@@ -192,7 +192,7 @@ export default function DashboardPage() {
           {/* Real-time Terminal Log */}
           <div className="glass-panel rounded-xl h-48 shrink-0 flex flex-col overflow-hidden bg-obsidian-deep">
             <div className="px-4 py-2 border-b border-cyber-border flex justify-between items-center bg-surface-container-low/50">
-              <h2 className="font-mono text-on-surface-variant uppercase tracking-widest text-[10px]">Memory Telemetry Stream</h2>
+              <h2 className="font-mono text-on-surface-variant uppercase tracking-widest text-[10px]">Live Activity Feed</h2>
               <span className="font-mono text-[10px] text-on-surface-variant">{memories.length} entries</span>
             </div>
             <div className="flex-1 p-3 font-mono text-[11px] text-on-surface-variant overflow-y-auto terminal-scroll whitespace-pre-wrap leading-relaxed tracking-wider flex flex-col-reverse">

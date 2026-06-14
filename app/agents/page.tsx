@@ -6,10 +6,10 @@ import { Activity, Box, Radio, Zap, ShieldAlert, Plus, Play, Database, Clock, X,
 import { Agent } from '@/lib/types';
 
 const MODEL_OPTIONS = [
-  'gemini-2.5-flash',
-  'gemini-2.5-pro',
-  'meta/llama-3.3-70b-instruct',
-  'meta/llama-3.1-70b-instruct',
+  { id: 'gemini-2.5-flash', label: 'Balanced & Fast (Gemini Flash)' },
+  { id: 'gemini-2.5-pro', label: 'Deep Thinking (Gemini Pro)' },
+  { id: 'meta/llama-3.3-70b-instruct', label: 'Open Source (Llama 3.3)' },
+  { id: 'meta/llama-3.1-70b-instruct', label: 'Open Source (Llama 3.1)' },
 ];
 
 const STAGES = [
@@ -39,7 +39,7 @@ export default function AgentsPage() {
   const [spawnOpen, setSpawnOpen] = useState(false);
   const [spawnName, setSpawnName] = useState("");
   const [spawnRole, setSpawnRole] = useState("");
-  const [spawnModel, setSpawnModel] = useState(MODEL_OPTIONS[0]);
+  const [spawnModel, setSpawnModel] = useState(MODEL_OPTIONS[0].id);
   const [spawnStage, setSpawnStage] = useState<number>(-1);
   const [spawnError, setSpawnError] = useState<string | null>(null);
 
@@ -100,7 +100,7 @@ export default function AgentsPage() {
         setSpawnOpen(false);
         setSpawnName("");
         setSpawnRole("");
-        setSpawnModel(MODEL_OPTIONS[0]);
+        setSpawnModel(MODEL_OPTIONS[0].id);
         setSpawnStage(-1);
         await fetchAgents();
       }
@@ -185,6 +185,21 @@ export default function AgentsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
               {loading && agents.length === 0 ? (
                 <div className="text-on-surface-variant font-mono p-4">Loading agents...</div>
+              ) : agents.length === 0 ? (
+                <div className="col-span-full flex flex-col items-center justify-center p-16 glass-panel rounded-2xl border border-primary/20 text-center relative overflow-hidden">
+                   <div className="absolute inset-0 bg-primary/5 pulse-active pointer-events-none"></div>
+                   <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-6 relative z-10">
+                     <Box size={40} className="text-primary" />
+                   </div>
+                   <h3 className="text-2xl font-bold text-on-surface mb-3 relative z-10">No Digital Workers Yet</h3>
+                   <p className="text-on-surface-variant text-sm mb-8 max-w-md relative z-10">Your fleet is currently empty. Add a digital worker to start automating tasks, monitoring systems, and increasing your team capacity.</p>
+                   <button 
+                     onClick={() => { setSpawnError(null); setSpawnOpen(true); }} 
+                     className="px-6 py-3 bg-primary text-on-primary-fixed rounded-lg font-mono font-bold uppercase tracking-widest text-[13px] hover:brightness-110 shadow-[0_0_20px_rgba(var(--primary-rgb),0.4)] transition-all relative z-10"
+                   >
+                     Create your first Assistant
+                   </button>
+                </div>
               ) : agents.map((agent) => (
                 <div key={agent.id} className={`glass-panel hover-lift p-5 rounded-xl group flex flex-col ${agent.status === 'running' ? 'pulse-active' : ''}`}>
                   
@@ -306,7 +321,7 @@ export default function AgentsPage() {
                     onChange={(e) => setSpawnModel(e.target.value)}
                     className="w-full bg-surface-container-low border border-cyber-border rounded-lg px-3 py-2.5 text-sm text-on-surface outline-none focus:border-primary/60 transition-colors font-mono"
                   >
-                    {MODEL_OPTIONS.map((m) => <option key={m} value={m} className="bg-surface-container">{m}</option>)}
+                    {MODEL_OPTIONS.map((m) => <option key={m.id} value={m.id} className="bg-surface-container">{m.label}</option>)}
                   </select>
                 </div>
 
