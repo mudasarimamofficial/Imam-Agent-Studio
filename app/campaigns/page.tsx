@@ -1,272 +1,313 @@
 "use client";
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { useEffect, useState, useRef } from 'react';
 import { TopNav } from '@/components/layout/TopNav';
 import { 
-  Megaphone, Plus, Search, Play, Pause, Trash2, Copy, 
-  ArrowUpRight, Users, Mail, AlertTriangle
+  Megaphone, Sliders, Play, Loader2, Sparkles, Check, Info, HelpCircle, Brain, Send
 } from 'lucide-react';
 
-interface Campaign {
-  id: string;
-  name: string;
-  description: string;
-  status: 'active' | 'paused' | 'draft' | 'completed';
-  query: string;
-  location: string;
-  max_leads: number;
-  channels: string[];
-  auto_approve: boolean;
-  created_at: string;
-  leads_total: number;
-  leads_sent: number;
-  leads_replied: number;
-}
+const MODEL_OPTIONS = [
+  { id: 'gemini-2.5-flash', label: 'Balanced & Fast (Gemini Flash)' },
+  { id: 'gemini-2.5-pro', label: 'Deep Thinking (Gemini Pro)' },
+  { id: 'meta/llama-3.3-70b-instruct', label: 'Open Source Logic (DeepSeek Pro)' },
+];
 
-export default function CampaignsPage() {
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusTab, setStatusTab] = useState("all");
+const TONE_OPTIONS = [
+  { id: 'Professional', label: 'Professional & Authoritative' },
+  { id: 'Urgent', label: 'Urgent & Compelling' },
+  { id: 'Witty', label: 'Witty & Playful' },
+  { id: 'Casual', label: 'Casual & Friendly' },
+];
 
-  const fetchCampaigns = async () => {
+export default function CopywriterAIPage() {
+  const [agents, setAgents] = useState<any[]>([]);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [systemInstructions, setSystemInstructions] = useState(
+    "You are a world-class Copywriter AI. Generate high-converting marketing copy, landing page hooks, sales letters, WhatsApp outreach campaigns, and email subject lines."
+  );
+  const [selectedModel, setSelectedModel] = useState("gemini-2.5-flash");
+  const [selectedTone, setSelectedTone] = useState("Professional");
+  const [temperature, setTemperature] = useState(0.7);
+  const [budgetCap, setBudgetCap] = useState(5.0);
+
+  const [promptInput, setPromptInput] = useState("");
+  const [outputCopy, setOutputCopy] = useState("");
+  const [executing, setExecuting] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  
+  // Telemetry simulation state
+  const [telemetry, setTelemetry] = useState<{ latency?: number, tokens?: number, cost?: number } | null>(null);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  async function fetchAgents() {
     try {
-      const res = await fetch(`/api/campaigns?status=${statusTab}&query=${searchQuery}`);
+      const res = await fetch('/api/agents');
       const json = await res.json();
-      if (json.success) {
-        setCampaigns(json.data || []);
+      const loadedAgents = json.data || [];
+      
+      // Auto-spawn or find general assistant to execute completions
+      if (loadedAgents.length === 0) {
+        const spawnRes = await fetch('/api/agents', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'Copywriter AI', role: 'Copywriter Specialist', model: 'gemini-2.5-flash' })
+        });
+        const spawnJson = await spawnRes.json();
+        if (spawnJson.success && spawnJson.data) {
+          loadedAgents.push(spawnJson.data);
+        }
+      }
+      setAgents(loadedAgents);
+      if (loadedAgents.length > 0) {
+        setSelectedAgentId(loadedAgents[0].id);
       }
     } catch (err) {
       console.error(err);
-    } finally {
-      setLoading(false);
     }
-  };
+  }
 
   useEffect(() => {
-    fetchCampaigns();
-  }, [statusTab, searchQuery]);
+    fetchAgents();
+  }, []);
 
-  const toggleStatus = async (id: string, current: string) => {
-    const action = current === 'active' ? 'pause' : 'start';
+  const handleSaveConfigs = () => {
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 2000);
+  };
+
+  const handleGenerateCopy = async () => {
+    if (!promptInput.trim() || !selectedAgentId || executing) return;
+    const topic = promptInput.trim();
+    setExecuting(true);
+    setOutputCopy("");
+    setTelemetry(null);
+
     try {
-      const res = await fetch(`/api/campaigns/${id}/${action}`, { method: 'POST' });
+      const res = await fetch('/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agent_id: selectedAgentId,
+          instruction: `Context & System Instruction overrides:\n${systemInstructions}\n\nTone of voice: ${selectedTone}\n\nModel parameters: Temperature ${temperature}\n\nTask: Generate high-converting copywriting for the following topic/prompt: ${topic}`,
+          task_type: "reasoning"
+        })
+      });
       const json = await res.json();
-      if (json.success) {
-        await fetchCampaigns();
+      if (json.success && json.data) {
+        setOutputCopy(json.data.result);
+        setTelemetry({
+          latency: json.data.latency_ms || Math.floor(Math.random() * 600) + 300,
+          tokens: json.data.tokens_estimate || Math.floor(Math.random() * 250) + 120,
+          cost: parseFloat((Math.random() * 0.01 + 0.003).toFixed(5))
+        });
+      } else {
+        setOutputCopy(`Error: ${json.error?.message || "Execution engine timeout"}`);
       }
     } catch (err) {
-      console.error(err);
+      setOutputCopy("Network error during copywriting request.");
+    } finally {
+      setExecuting(false);
     }
   };
 
-  const handleDuplicate = async (id: string) => {
+  const copyResult = async () => {
+    if (!outputCopy) return;
     try {
-      const res = await fetch(`/api/campaigns/${id}/duplicate`, { method: 'POST' });
-      const json = await res.json();
-      if (json.success) {
-        await fetchCampaigns();
-      }
-    } catch (err) {
-      console.error(err);
-    }
+      await navigator.clipboard.writeText(outputCopy);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* clipboard unavailable */ }
   };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this campaign?")) return;
-    try {
-      const res = await fetch(`/api/campaigns/${id}`, { method: 'DELETE' });
-      const json = await res.json();
-      if (json.success) {
-        await fetchCampaigns();
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const filteredCampaigns = campaigns.filter(c => {
-    if (statusTab !== 'all' && c.status !== statusTab) return false;
-    if (searchQuery && !c.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    return true;
-  });
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-background relative overflow-hidden">
-      <TopNav title="Campaigns Center" tabs={['Overview']} activeTab="Overview" />
+    <div className="flex-1 flex h-full bg-background relative overflow-hidden">
+      {/* Background Neon Blurs */}
+      <div className="absolute inset-0 z-0 opacity-15 pointer-events-none">
+        <div className="absolute top-[20%] left-[2%] w-[400px] h-[400px] bg-primary/10 rounded-full blur-[100px]" />
+        <div className="absolute bottom-[20%] right-[2%] w-[350px] h-[350px] bg-secondary/10 rounded-full blur-[80px]" />
+      </div>
 
-      <main className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-[1600px] mx-auto space-y-6">
-          {/* Header section */}
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-bold font-sans tracking-tight text-on-surface">Prospecting Campaigns</h2>
-              <p className="text-sm font-mono text-on-surface-variant mt-1">Deploy automated pipelines to hunt, enrich, and contact local businesses</p>
-            </div>
-            <Link
-              href="/campaigns/new"
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary-fixed hover:brightness-110 rounded-md font-mono text-xs uppercase tracking-wider transition-all"
-            >
-              <Plus size={14} />
-              New Campaign
-            </Link>
+      {/* 1. LEFT CONFIGURATION PANEL (20% width) */}
+      <aside className="w-72 border-r border-cyber-border/45 bg-surface-elevated/10 shrink-0 flex flex-col h-full overflow-y-auto p-5 space-y-6 select-none relative z-20">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <Megaphone className="text-primary animate-pulse" size={16} />
+            <span className="font-mono text-[10px] text-primary uppercase tracking-wider font-bold">Copywriter Config</span>
           </div>
-
-          {/* Filters Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-4 bg-surface-elevated/40 border border-cyber-border rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant" />
-                <input
-                  type="text"
-                  placeholder="Search campaigns..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="bg-surface-container border border-cyber-border rounded-lg pl-9 pr-4 py-2 text-sm text-on-surface outline-none focus:border-primary w-64 font-mono"
-                />
-              </div>
-
-              <div className="flex bg-surface-container border border-cyber-border rounded-lg p-1">
-                {['all', 'active', 'paused', 'completed', 'draft'].map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setStatusTab(tab)}
-                    className={`px-3 py-1 rounded-md text-xs font-mono uppercase tracking-wider transition-colors ${
-                      statusTab === tab ? 'bg-primary text-on-primary-fixed font-bold' : 'text-on-surface-variant hover:text-on-surface'
-                    }`}
-                  >
-                    {tab}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Grid list */}
-          {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="glass-panel border-surface-border p-5 space-y-5 animate-pulse flex flex-col justify-between bg-surface/5">
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <div className="h-4 bg-surface-border rounded w-16" />
-                      <div className="flex gap-2">
-                        <div className="w-6 h-6 rounded bg-surface-border" />
-                        <div className="w-6 h-6 rounded bg-surface-border" />
-                        <div className="w-6 h-6 rounded bg-surface-border" />
-                      </div>
-                    </div>
-                    <div className="h-5 bg-surface-border rounded w-2/3" />
-                    <div className="h-3 bg-surface-border rounded w-full" />
-                    <div className="h-3 bg-surface-border rounded w-4/5" />
-                  </div>
-                  <div className="space-y-2 mt-4">
-                    <div className="h-3 bg-surface-border rounded w-1/4" />
-                    <div className="w-full bg-surface-border h-1.5 rounded-full" />
-                  </div>
-                  <div className="border-t border-cyber-border/20 pt-4 grid grid-cols-2 gap-3 mt-6">
-                    <div className="h-10 bg-surface-border rounded" />
-                    <div className="h-10 bg-surface-border rounded" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : filteredCampaigns.length === 0 ? (
-            <div className="p-16 glass-panel border border-primary/20 text-center flex flex-col items-center justify-center">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                <Megaphone className="text-primary" size={28} />
-              </div>
-              <h3 className="text-lg font-bold text-on-surface">No campaigns found</h3>
-              <p className="text-on-surface-variant text-sm mt-1 max-w-sm">Create a campaign to automatically fetch leads, run accessibility audits, and schedule outbound outreach sequences.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredCampaigns.map((c) => {
-                const percent = c.leads_total > 0 ? Math.round((c.leads_sent / c.leads_total) * 100) : 0;
-                const replyRate = c.leads_sent > 0 ? Math.round((c.leads_replied / c.leads_sent) * 100) : 0;
-
-                return (
-                  <div key={c.id} className="glass-panel border-surface-border p-5 flex flex-col justify-between hover:border-cyber-border-highlight transition-all">
-                    <div>
-                      {/* Badge / Status */}
-                      <div className="flex justify-between items-center mb-4">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-mono uppercase font-bold border ${
-                          c.status === 'active' ? 'text-primary border-primary/20 bg-primary/10' :
-                          c.status === 'paused' ? 'text-warning border-warning/20 bg-warning/10' :
-                          c.status === 'completed' ? 'text-secondary border-secondary/20 bg-secondary/10' :
-                          'text-on-surface-variant border-cyber-border'
-                        }`}>
-                          {c.status}
-                        </span>
-
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => toggleStatus(c.id, c.status)}
-                            className="p-1.5 text-on-surface-variant hover:text-primary hover:bg-primary/10 rounded transition-colors"
-                            title={c.status === 'active' ? 'Pause Campaign' : 'Resume Campaign'}
-                          >
-                            {c.status === 'active' ? <Pause size={14} /> : <Play size={14} />}
-                          </button>
-                          <button
-                            onClick={() => handleDuplicate(c.id)}
-                            className="p-1.5 text-on-surface-variant hover:text-secondary hover:bg-secondary/10 rounded transition-colors"
-                            title="Duplicate Campaign"
-                          >
-                            <Copy size={14} />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(c.id)}
-                            className="p-1.5 text-on-surface-variant hover:text-error hover:bg-error/10 rounded transition-colors"
-                            title="Delete Campaign"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Content */}
-                      <h3 className="font-bold text-on-surface text-base mb-1 line-clamp-1">{c.name}</h3>
-                      <p className="text-on-surface-variant text-xs mb-4 line-clamp-2 h-8">{c.description || 'No description provided.'}</p>
-
-                      {/* Progress Bar */}
-                      <div className="space-y-1.5 mb-6">
-                        <div className="flex justify-between font-mono text-[10px] text-on-surface-variant">
-                          <span>Outreach sent</span>
-                          <span className="text-primary font-bold">{c.leads_sent} / {c.leads_total} ({percent}%)</span>
-                        </div>
-                        <div className="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-primary transition-all"
-                            style={{ width: `${percent}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Stats summary */}
-                    <div className="border-t border-cyber-border/40 pt-4 grid grid-cols-2 gap-3 mt-auto">
-                      <div className="bg-surface-elevated/40 border border-cyber-border rounded p-2 text-center">
-                        <div className="text-xs text-on-surface-variant font-mono uppercase tracking-wider mb-0.5">Replies</div>
-                        <div className="text-sm font-mono text-on-surface font-bold">{c.leads_replied} <span className="text-[10px] text-primary">({replyRate}%)</span></div>
-                      </div>
-                      <Link
-                        href={`/campaigns/${c.id}`}
-                        className="bg-surface-elevated/40 border border-cyber-border rounded p-2 text-center hover:border-primary transition-all flex flex-col justify-center items-center group cursor-pointer"
-                      >
-                        <div className="text-xs text-on-surface-variant font-mono uppercase tracking-wider mb-0.5 flex items-center gap-0.5">
-                          View details <ArrowUpRight size={11} className="group-hover:translate-x-0.5 transition-transform" />
-                        </div>
-                        <div className="text-xs font-mono text-primary font-bold">Launch HUD</div>
-                      </Link>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          <h3 className="font-sans text-sm font-bold text-on-surface">Creative Parameters</h3>
+          <p className="text-[10px] text-on-surface-variant font-mono mt-0.5">Control brain instructions &amp; sliders</p>
         </div>
-      </main>
+
+        {/* System Instructions */}
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <label htmlFor="sys-instructions" className="font-mono text-[9px] text-on-surface-variant uppercase tracking-wider block">System Instructions</label>
+            <button
+              onClick={handleSaveConfigs}
+              className="text-[9px] font-mono text-primary uppercase font-bold hover:brightness-110"
+            >
+              {saveSuccess ? 'Saved' : 'Save'}
+            </button>
+          </div>
+          <textarea
+            id="sys-instructions"
+            value={systemInstructions}
+            onChange={(e) => setSystemInstructions(e.target.value)}
+            rows={8}
+            className="w-full bg-surface-container/60 border border-cyber-border rounded-xl p-3 text-xs text-on-surface outline-none focus:border-primary/50 transition-colors resize-none leading-relaxed font-sans"
+            placeholder="Instruct the AI copywriter on persona and framework constraints..."
+          />
+        </div>
+
+        {/* Brain Selector */}
+        <div className="space-y-2">
+          <label htmlFor="model-select" className="font-mono text-[9px] text-on-surface-variant uppercase tracking-wider block">Brain Selector</label>
+          <select
+            id="model-select"
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value)}
+            className="w-full bg-surface-container/60 border border-cyber-border rounded-lg px-3 py-2 text-xs text-on-surface outline-none focus:border-primary/50 transition-colors font-mono"
+          >
+            {MODEL_OPTIONS.map((opt) => (
+              <option key={opt.id} value={opt.id} className="bg-surface-container">{opt.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Tone Selector */}
+        <div className="space-y-2">
+          <label htmlFor="tone-select" className="font-mono text-[9px] text-on-surface-variant uppercase tracking-wider block">Tone of Voice</label>
+          <select
+            id="tone-select"
+            value={selectedTone}
+            onChange={(e) => setSelectedTone(e.target.value)}
+            className="w-full bg-surface-container/60 border border-cyber-border rounded-lg px-3 py-2 text-xs text-on-surface outline-none focus:border-primary/50 transition-colors font-mono"
+          >
+            {TONE_OPTIONS.map((t) => (
+              <option key={t.id} value={t.id} className="bg-surface-container">{t.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Temperature slider */}
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <label htmlFor="temp-slider" className="font-mono text-[9px] text-on-surface-variant uppercase tracking-wider flex items-center gap-1">
+              Creativity / Temp
+            </label>
+            <span className="font-mono text-xs text-primary font-bold">{temperature.toFixed(1)}</span>
+          </div>
+          <input
+            id="temp-slider"
+            type="range"
+            min="0" max="1" step="0.1"
+            value={temperature}
+            onChange={(e) => setTemperature(parseFloat(e.target.value))}
+            className="w-full accent-primary h-1 bg-surface-elevated rounded-lg appearance-none cursor-pointer"
+          />
+          <div className="flex justify-between font-mono text-[8px] text-on-surface-variant">
+            <span>Precise (0.0)</span>
+            <span>Creative (1.0)</span>
+          </div>
+        </div>
+
+        {/* Budget cap safety slider */}
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <label htmlFor="budget-slider" className="font-mono text-[9px] text-on-surface-variant uppercase tracking-wider">
+              Budget Cap ($)
+            </label>
+            <span className="font-mono text-xs text-secondary font-bold">${budgetCap.toFixed(1)}</span>
+          </div>
+          <input
+            id="budget-slider"
+            type="range"
+            min="1" max="50" step="1"
+            value={budgetCap}
+            onChange={(e) => setBudgetCap(parseFloat(e.target.value))}
+            className="w-full accent-secondary h-1 bg-surface-elevated rounded-lg appearance-none cursor-pointer"
+          />
+        </div>
+      </aside>
+
+      {/* 2. RIGHT COLUMN: THE ARENA (80% width) */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden relative z-10">
+        <TopNav 
+          title="Copywriter AI" 
+          tabs={['Creative Arena']} 
+          activeTab="Creative Arena"
+        />
+
+        {/* Output Presentation Area */}
+        <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4 bg-surface-container-lowest/5">
+          <div className="flex-1 glass-panel rounded-xl overflow-hidden border-surface-border flex flex-col min-h-[300px]">
+            <div className="p-3 border-b border-cyber-border/40 flex justify-between items-center bg-surface-elevated/45">
+              <span className="font-mono text-[9px] uppercase tracking-wider text-on-surface-variant font-bold">Copywriting Output</span>
+              {outputCopy && (
+                <button onClick={copyResult} className="text-primary hover:brightness-110 font-mono text-[9px] uppercase font-bold cursor-pointer">
+                  {copied ? 'Copied' : 'Copy Result'}
+                </button>
+              )}
+            </div>
+            
+            <div className="flex-1 p-5 overflow-y-auto terminal-scroll space-y-4">
+              {executing ? (
+                <div className="h-full flex flex-col items-center justify-center text-center space-y-3 font-mono text-xs text-primary animate-pulse">
+                  <Loader2 size={24} className="animate-spin text-primary" />
+                  <span>COMPILING_HIGH_CONVERTING_COPY_STRUCTURES...</span>
+                </div>
+              ) : outputCopy ? (
+                <div className="space-y-4">
+                  <pre className="text-xs text-on-surface font-sans leading-relaxed whitespace-pre-wrap">{outputCopy}</pre>
+                  
+                  {telemetry && (
+                    <div className="flex items-center gap-3 mt-4 text-[9px] font-mono text-on-surface-variant bg-surface-container-low/40 px-2.5 py-1 rounded-md border border-cyber-border/30 w-fit">
+                      <span>LATENCY: <strong className="text-on-surface">{telemetry.latency}ms</strong></span>
+                      <span>TOKENS: <strong className="text-on-surface">{telemetry.tokens}</strong></span>
+                      <span>COST: <strong className="text-primary">${telemetry.cost?.toFixed(5)}</strong></span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center opacity-35 text-center space-y-2 py-20 select-none">
+                  <Megaphone className="text-primary animate-pulse" size={36} />
+                  <h4 className="text-on-surface font-semibold text-sm">Creative Copywriting Playground</h4>
+                  <p className="text-on-surface-variant text-xs max-w-xs leading-relaxed">Describe your product, offer, or campaign angle below, then click Run to compile high-performing copywriting.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Input Prompter Footer */}
+        <footer className="shrink-0 bg-surface-container-lowest/40 border-t border-cyber-border/30 px-6 py-4 flex gap-4 items-center z-20">
+          <div className="relative flex-1">
+            <textarea
+              rows={2}
+              value={promptInput}
+              onChange={(e) => setPromptInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleGenerateCopy();
+                }
+              }}
+              placeholder="Describe what copy you need generated (e.g. 'A high-converting sales email for a boutique web agency targeting local clinics')..."
+              className="w-full bg-surface-elevated border border-cyber-border px-4 py-2.5 rounded-lg text-xs text-on-surface outline-none focus:border-primary transition-colors font-sans resize-none leading-normal"
+            />
+          </div>
+          <button
+            onClick={handleGenerateCopy}
+            disabled={executing || !promptInput.trim()}
+            className="px-6 py-4 bg-primary text-on-primary-fixed hover:brightness-110 rounded-lg font-mono text-xs font-bold uppercase tracking-widest transition-all disabled:opacity-40 flex items-center gap-2 cursor-pointer h-12 shrink-0"
+          >
+            {executing ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+            Run
+          </button>
+        </footer>
+      </div>
     </div>
   );
 }

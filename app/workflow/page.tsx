@@ -1,384 +1,267 @@
 "use client";
 
-import { useState, useCallback } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { TopNav } from '@/components/layout/TopNav';
-import {
-  ReactFlow,
-  MiniMap,
-  Controls,
-  Background,
-  useNodesState,
-  useEdgesState,
-  addEdge,
-  Connection,
-  Edge,
-  Node,
-} from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
-
-import {
-  Database,
-  Cpu,
-  Wrench,
-  Globe,
-  Play,
-  Square,
-  Eye,
+import { 
+  Video, Sliders, Play, Loader2, Sparkles, Check, Info, HelpCircle
 } from 'lucide-react';
-import { LLMNode, MemoryNode, ToolNode, APINode } from '@/components/nodes/WorkflowNodes';
 
-const nodeTypes = {
-  llm: LLMNode,
-  memory: MemoryNode,
-  tool: ToolNode,
-  api: APINode,
-};
-
-const NODE_LIBRARY = [
-  { type: 'llm', label: 'AI Writer / Thinker', icon: Cpu, model: 'Gemini / Llama (hybrid router)', accent: 'text-primary', desc: 'Routes a prompt through the weighted Gemini/NVIDIA router.' },
-  { type: 'memory', label: 'Recall Past Work', icon: Database, model: 'Supabase keyword search', accent: 'text-telemetry-blue', desc: 'Searches your persisted memory store for matching context.' },
-  { type: 'tool', label: 'Run Action', icon: Wrench, model: 'Sandboxed registry', accent: 'text-strategic-violet', desc: 'Runs a sandboxed tool: calc, timestamp, echo, uppercase, word_count.' },
-  { type: 'api', label: 'Fetch Data', icon: Globe, model: 'Guarded HTTP GET', accent: 'text-agent-active-glow', desc: 'Fetches a public URL (SSRF-guarded, 15s timeout).' },
-];
-
-const initialNodes: Node[] = [
-  {
-    id: 'recall',
-    type: 'memory',
-    position: { x: 50, y: 150 },
-    data: { label: 'Recall Past Work', model: 'Supabase search', detail: 'Pulls prior context matching "agent".' },
-  },
-  {
-    id: 'reason',
-    type: 'llm',
-    position: { x: 400, y: 150 },
-    data: { label: 'AI Writer / Thinker', model: 'Gemini / Llama', detail: 'Drafts a short technical summary from context.' },
-  },
-  {
-    id: 'review',
-    type: 'llm',
-    position: { x: 750, y: 150 },
-    data: { label: 'AI Writer / Thinker', model: 'Gemini / Llama', detail: 'Tightens and reviews the draft.' },
-  },
-];
-
-const initialEdges: Edge[] = [
-  { id: 'e-recall-reason', source: 'recall', target: 'reason', animated: true, style: { stroke: '#a3e635' } },
-  { id: 'e-reason-review', source: 'reason', target: 'review', animated: true, style: { stroke: '#a3e635' } },
-];
-
-export default function WorkflowPage() {
-  const [running, setRunning] = useState(false);
-  const [workflowStatus, setWorkflowStatus] = useState<string | null>(null);
-
-  // Pre-Flight Modal state
-  const [preFlightOpen, setPreFlightOpen] = useState(false);
-  const [preFlightBudget, setPreFlightBudget] = useState<number>(5);
-  const [preFlightModel, setPreFlightModel] = useState("auto");
-
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
-
-  const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
-
-  const onConnect = useCallback(
-    (params: Connection | Edge) => setEdges((eds) => addEdge({ ...params, animated: true, style: { stroke: '#a3e635' } } as Edge, eds)),
-    [setEdges],
+export default function VideoScriptAssistantPage() {
+  const [agents, setAgents] = useState<any[]>([]);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [systemInstructions, setSystemInstructions] = useState(
+    "You are a world-class Video Script Assistant. Generate highly engaging, viral video scripts with clear timestamps, speaker narration, visual/audio directions, and high-impact hooks."
   );
+  const [preFlightModel, setPreFlightModel] = useState("auto");
+  const [temperature, setTemperature] = useState(0.7);
+  const [budgetCap, setBudgetCap] = useState(5.0);
+  const [maxTokens, setMaxTokens] = useState(4000);
 
-  const onDragOver = useCallback((event: any) => {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
+  const [promptInput, setPromptInput] = useState("");
+  const [outputScript, setOutputScript] = useState("");
+  const [executing, setExecuting] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  async function fetchAgents() {
+    try {
+      const res = await fetch('/api/agents');
+      const json = await res.json();
+      const loadedAgents = json.data || [];
+      
+      // Auto-spawn or find general assistant to execute completions
+      if (loadedAgents.length === 0) {
+        const spawnRes = await fetch('/api/agents', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'Video Script Assistant', role: 'Content Generator', model: 'gemini-2.5-flash' })
+        });
+        const spawnJson = await spawnRes.json();
+        if (spawnJson.success && spawnJson.data) {
+          loadedAgents.push(spawnJson.data);
+        }
+      }
+      setAgents(loadedAgents);
+      if (loadedAgents.length > 0) {
+        setSelectedAgentId(loadedAgents[0].id);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  useEffect(() => {
+    fetchAgents();
   }, []);
 
-  const onDrop = useCallback(
-    (event: any) => {
-      event.preventDefault();
-
-      const type = event.dataTransfer.getData('application/reactflow');
-      if (typeof type === 'undefined' || !type || !reactFlowInstance) {
-        return;
-      }
-
-      const position = reactFlowInstance.screenToFlowPosition({
-        x: event.clientX,
-        y: event.clientY,
-      });
-      
-      const libraryNode = NODE_LIBRARY.find(n => n.type === type);
-
-      const newNode = {
-        id: `${type}_${Date.now()}`,
-        type,
-        position,
-        data: { label: libraryNode?.label || type, detail: 'Configure node parameters' },
-      };
-
-      setNodes((nds) => nds.concat(newNode));
-    },
-    [reactFlowInstance, setNodes]
-  );
-
-  const onDragStart = (event: any, nodeType: string) => {
-    event.dataTransfer.setData('application/reactflow', nodeType);
-    event.dataTransfer.effectAllowed = 'move';
+  const handleSaveConfigs = () => {
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 2000);
   };
 
-  const executeWorkflow = async () => {
-    if (running) return;
-    setPreFlightOpen(false);
-    setRunning(true);
-    setWorkflowStatus("Booting AI Pipeline Engine... Please stand by.");
-
-    // Visually highlight nodes one by one to simulate execution path
-    let currentIdx = 0;
-    const highlightInterval = setInterval(() => {
-      setNodes((nds) => nds.map((node, i) => {
-        if (i === currentIdx % nds.length) {
-          const costTick = (Math.random() * 0.05).toFixed(4);
-          const activeModelName = preFlightModel === 'auto' ? 'Nemotron-3-Ultra' : preFlightModel;
-          return { 
-            ...node, 
-            data: { ...node.data, currentCost: costTick, activeModel: activeModelName },
-            style: { ...node.style, outline: '2px solid #a3e635', outlineOffset: '4px', boxShadow: '0 0 20px rgba(163, 230, 53, 0.4)', transition: 'all 0.3s' } 
-          };
-        }
-        return { ...node, data: { ...node.data, currentCost: undefined, activeModel: undefined }, style: { ...node.style, outline: 'none', boxShadow: 'none' } };
-      }));
-      currentIdx++;
-    }, 800);
-
-    // Serialize the graph state
-    const serializedNodes = nodes.map(n => ({
-      id: n.id,
-      type: n.type,
-      input: n.data.detail,
-      output: '',
-      status: 'pending'
-    }));
+  const handleGenerateScript = async () => {
+    if (!promptInput.trim() || !selectedAgentId || executing) return;
+    const topic = promptInput.trim();
+    setExecuting(true);
+    setOutputScript("");
 
     try {
-      const res = await fetch('/api/workflow', {
+      const res = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: "Orchestration_Alpha_01",
-          nodes: serializedNodes,
-          edges: edges.map(e => ({ source: e.source, target: e.target }))
+          agent_id: selectedAgentId,
+          instruction: `Context & System Instruction overrides:\n${systemInstructions}\n\nModel parameters: Temperature ${temperature}\n\nTask: Generate a full video script for the following topic: ${topic}`,
+          task_type: "reasoning"
         })
       });
-      const data = await res.json();
-      if (data.success && data.data?.status === "completed") {
-        setWorkflowStatus("Success — pipeline executed against the live engine.");
+      const json = await res.json();
+      if (json.success && json.data) {
+        setOutputScript(json.data.result);
       } else {
-        setWorkflowStatus(data.error?.message || "Workflow execution failed.");
+        setOutputScript(`Error: ${json.error?.message || "Execution engine timeout"}`);
       }
-    } catch (e) {
-      console.error(e);
-      setWorkflowStatus("This task took too long and stopped. Tap to try again.");
+    } catch (err) {
+      setOutputScript("Network error during scripting sequence.");
     } finally {
-      clearInterval(highlightInterval);
-      setNodes((nds) => nds.map(node => ({ ...node, data: { ...node.data, currentCost: undefined, activeModel: undefined }, style: { ...node.style, outline: 'none', boxShadow: 'none' } })));
-      setRunning(false);
-      setTimeout(() => setWorkflowStatus(null), 6000);
+      setExecuting(false);
     }
   };
 
-  const deleteNode = useCallback((nodeId: string) => {
-    setNodes((nds) => nds.filter((n) => n.id !== nodeId));
-    setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
-  }, [setNodes, setEdges]);
-
-  const nodesWithCallbacks = nodes.map(node => ({
-    ...node,
-    data: {
-      ...node.data,
-      onDelete: deleteNode
-    }
-  }));
+  const copyScript = async () => {
+    if (!outputScript) return;
+    try {
+      await navigator.clipboard.writeText(outputScript);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* clipboard unavailable */ }
+  };
 
   return (
-    <div className="flex-1 flex flex-col h-full relative overflow-hidden bg-background">
-      <TopNav title="Workflow Automation" tabs={['Pipeline Viewer']} activeTab="Pipeline Viewer" />
+    <div className="flex-1 flex h-full bg-background relative overflow-hidden">
+      {/* Background Neon Blurs */}
+      <div className="absolute inset-0 z-0 opacity-15 pointer-events-none">
+        <div className="absolute top-[20%] left-[2%] w-[400px] h-[400px] bg-primary/10 rounded-full blur-[100px]" />
+        <div className="absolute bottom-[20%] right-[2%] w-[350px] h-[350px] bg-secondary/10 rounded-full blur-[80px]" />
+      </div>
 
-      <main className="flex-1 flex overflow-hidden">
-        {/* Node Library */}
-        <aside className="w-72 glass-panel border-r border-cyber-border flex flex-col h-full z-20 shrink-0">
-          <div className="p-4 border-b border-cyber-border">
-            <h2 className="font-bold text-on-surface text-xl mb-1">Node Library</h2>
-            <p className="font-mono text-[12px] text-on-surface-variant">Drag components to the canvas</p>
+      {/* 1. LEFT CONFIGURATION PANEL (20% width) */}
+      <aside className="w-72 border-r border-cyber-border/45 bg-surface-elevated/10 shrink-0 flex flex-col h-full overflow-y-auto p-5 space-y-6 select-none relative z-20">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <Video className="text-primary animate-pulse" size={16} />
+            <span className="font-mono text-[10px] text-primary uppercase tracking-wider font-bold">Script Settings</span>
           </div>
-          <div className="p-3 space-y-2 overflow-y-auto terminal-scroll">
-            {NODE_LIBRARY.map((n) => {
-              const Icon = n.icon;
-              return (
-                <div 
-                  key={n.type} 
-                  className="bg-surface border border-cyber-border p-3 rounded-lg hover-lift cursor-grab"
-                  draggable
-                  onDragStart={(e) => onDragStart(e, n.type)}
-                >
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className={`w-8 h-8 rounded bg-surface-bright flex items-center justify-center ${n.accent}`}>
-                      <Icon size={18} />
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-on-surface">{n.label}</div>
-                      <div className="text-[11px] font-mono text-on-surface-variant">{n.model}</div>
-                    </div>
-                  </div>
-                  <p className="text-[11px] text-on-surface-variant leading-relaxed">{n.desc}</p>
-                </div>
-              );
-            })}
+          <h3 className="font-sans text-sm font-bold text-on-surface">Video Script Config</h3>
+          <p className="text-[10px] text-on-surface-variant font-mono mt-0.5">Configure system rules &amp; sliders</p>
+        </div>
+
+        {/* System Instructions */}
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <label htmlFor="sys-instructions" className="font-mono text-[9px] text-on-surface-variant uppercase tracking-wider block">System Instructions</label>
+            <button
+              onClick={handleSaveConfigs}
+              className="text-[9px] font-mono text-primary uppercase font-bold hover:brightness-110"
+            >
+              {saveSuccess ? 'Saved' : 'Save'}
+            </button>
           </div>
-        </aside>
+          <textarea
+            id="sys-instructions"
+            value={systemInstructions}
+            onChange={(e) => setSystemInstructions(e.target.value)}
+            rows={8}
+            className="w-full bg-surface-container/60 border border-cyber-border rounded-xl p-3 text-xs text-on-surface outline-none focus:border-primary/50 transition-colors resize-none leading-relaxed font-sans"
+            placeholder="Instruct the AI on persona and scripting format..."
+          />
+        </div>
 
-        {/* Pipeline Canvas */}
-        <section className="flex-1 relative overflow-hidden bg-obsidian-deep">
-          {/* Toolbar */}
-          <div className="absolute top-4 left-4 right-4 z-30 flex justify-between items-start gap-3">
-            <div className="glass-panel rounded-lg p-2 flex items-center gap-3">
-              <div className="flex flex-col px-2">
-                <span className="text-sm font-semibold text-on-surface">Orchestration_Alpha_01</span>
-                <span className="text-[11px] font-mono text-on-surface-variant flex items-center gap-1">
-                  <Eye size={11} /> Visual Task Builder Canvas
-                </span>
-              </div>
-            </div>
+        {/* Brain Selector */}
+        <div className="space-y-2">
+          <label htmlFor="model-select" className="font-mono text-[9px] text-on-surface-variant uppercase tracking-wider block">Brain Selector</label>
+          <select
+            id="model-select"
+            value={preFlightModel}
+            onChange={(e) => setPreFlightModel(e.target.value)}
+            className="w-full bg-surface-container/60 border border-cyber-border rounded-lg px-3 py-2 text-xs text-on-surface outline-none focus:border-primary/50 transition-colors font-mono"
+          >
+            <option value="auto">Fast &amp; Balanced (Gemini Flash)</option>
+            <option value="pro">Deep Thinking (NVIDIA Nemotron Ultra)</option>
+            <option value="flash">Open Source Logic (DeepSeek Pro)</option>
+          </select>
+        </div>
 
-            <div className="flex gap-2 items-center">
-              {workflowStatus && (
-                <span className="glass-panel px-4 py-2 text-on-surface text-sm font-mono rounded-lg animate-fade-in max-w-md truncate">
-                  {workflowStatus}
-                </span>
+        {/* Temperature slider */}
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <label htmlFor="temp-slider" className="font-mono text-[9px] text-on-surface-variant uppercase tracking-wider flex items-center gap-1">
+              Creativity / Temp
+            </label>
+            <span className="font-mono text-xs text-primary font-bold">{temperature.toFixed(1)}</span>
+          </div>
+          <input
+            id="temp-slider"
+            type="range"
+            min="0" max="1" step="0.1"
+            value={temperature}
+            onChange={(e) => setTemperature(parseFloat(e.target.value))}
+            className="w-full accent-primary h-1 bg-surface-elevated rounded-lg appearance-none cursor-pointer"
+          />
+          <div className="flex justify-between font-mono text-[8px] text-on-surface-variant">
+            <span>Precise (0.0)</span>
+            <span>Creative (1.0)</span>
+          </div>
+        </div>
+
+        {/* Budget cap safety slider */}
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <label htmlFor="budget-slider" className="font-mono text-[9px] text-on-surface-variant uppercase tracking-wider">
+              Budget Cap ($)
+            </label>
+            <span className="font-mono text-xs text-secondary font-bold">${budgetCap.toFixed(1)}</span>
+          </div>
+          <input
+            id="budget-slider"
+            type="range"
+            min="1" max="50" step="1"
+            value={budgetCap}
+            onChange={(e) => setBudgetCap(parseFloat(e.target.value))}
+            className="w-full accent-secondary h-1 bg-surface-elevated rounded-lg appearance-none cursor-pointer"
+          />
+        </div>
+      </aside>
+
+      {/* 2. RIGHT COLUMN: THE ARENA (80% width) */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden relative z-10">
+        <TopNav 
+          title="Video Script Assistant" 
+          tabs={['Script Arena']} 
+          activeTab="Script Arena"
+        />
+
+        {/* Output Presentation Area */}
+        <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4 bg-surface-container-lowest/5">
+          <div className="flex-1 glass-panel rounded-xl overflow-hidden border-surface-border flex flex-col min-h-[300px]">
+            <div className="p-3 border-b border-cyber-border/40 flex justify-between items-center bg-surface-elevated/45">
+              <span className="font-mono text-[9px] uppercase tracking-wider text-on-surface-variant font-bold">Generated Video Script</span>
+              {outputScript && (
+                <button onClick={copyScript} className="text-primary hover:brightness-110 font-mono text-[9px] uppercase font-bold cursor-pointer">
+                  {copied ? 'Copied' : 'Copy Result'}
+                </button>
               )}
-              <button
-                onClick={() => setPreFlightOpen(true)}
-                disabled={running}
-                className={`glass-panel rounded-lg px-4 py-2 font-mono text-[12px] font-bold transition-all flex items-center gap-2 disabled:opacity-50 ${running ? 'text-secondary' : 'text-primary hover:brightness-110'}`}
-              >
-                {running ? <Square size={14} className="animate-pulse" /> : <Play size={14} />}
-                {running ? 'RUNNING...' : 'TEST RUN'}
-              </button>
             </div>
-          </div>
-
-          <ReactFlow
-            nodes={nodesWithCallbacks}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onInit={setReactFlowInstance}
-            onDrop={onDrop}
-            onDragOver={onDragOver}
-            nodeTypes={nodeTypes}
-            fitView
-            proOptions={{ hideAttribution: true }}
-            className="react-flow-glass"
-          >
-            <Background color="rgba(255, 255, 255, 0.05)" gap={24} size={1} />
-            <Controls className="bg-surface border-cyber-border text-on-surface fill-on-surface" />
-            <MiniMap 
-              nodeColor={(n) => {
-                switch(n.type) {
-                  case 'llm': return '#a3e635';
-                  case 'memory': return '#7cc0ff';
-                  case 'tool': return '#8b8cf8';
-                  case 'api': return '#bef264';
-                  default: return '#1a1d23';
-                }
-              }}
-              maskColor="rgba(8, 9, 11, 0.7)"
-              className="bg-surface border-cyber-border"
-            />
-          </ReactFlow>
-
-          {nodes.length === 0 && (
-            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none">
-              <div className="glass-panel p-12 rounded-2xl border border-primary/20 text-center max-w-md animate-fade-in flex flex-col items-center relative overflow-hidden pointer-events-auto shadow-[0_0_40px_rgba(var(--primary-rgb),0.1)]">
-                <div className="absolute inset-0 bg-primary/5 pulse-active pointer-events-none"></div>
-                <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-6 relative z-10">
-                  <Wrench size={40} className="text-primary" />
+            
+            <div className="flex-1 p-5 overflow-y-auto terminal-scroll">
+              {executing ? (
+                <div className="h-full flex flex-col items-center justify-center text-center space-y-3 font-mono text-xs text-primary animate-pulse">
+                  <Loader2 size={24} className="animate-spin text-primary" />
+                  <span>COMPILING_AI_VIDEO_SCRIPT_CHANNELS...</span>
                 </div>
-                <h3 className="text-2xl font-bold text-on-surface mb-3 relative z-10">Blank Canvas</h3>
-                <p className="text-on-surface-variant text-sm relative z-10">You haven't added any AI actions yet. Drag a node from the library to start building your automated workflow.</p>
-              </div>
-            </div>
-          )}
-        </section>
-      </main>
-
-      {/* Pre-Flight Execution Modal */}
-      {preFlightOpen && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-obsidian-deep/70 backdrop-blur-sm animate-fade-in"
-          onClick={() => setPreFlightOpen(false)}
-        >
-          <div
-            className="glass-elevated rounded-2xl w-full max-w-md p-6 relative overflow-hidden transition-all duration-300 border border-cyber-border/50"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between mb-5">
-              <div>
-                <h3 className="text-lg font-bold text-on-surface flex items-center gap-2">
-                  <Cpu size={18} className="text-primary" /> Pre-Flight Execution
-                </h3>
-                <p className="font-mono text-[11px] text-on-surface-variant mt-1">Configure parameters before pipeline execution</p>
-              </div>
-              <button onClick={() => setPreFlightOpen(false)} className="text-on-surface-variant hover:text-on-surface" aria-label="Close">
-                <span className="text-xl leading-none">&times;</span>
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between mb-2">
-                  <label htmlFor="pf-budget" className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Pipeline Budget Cap</label>
-                  <span className="font-mono text-[11px] text-primary font-bold">${preFlightBudget.toFixed(2)}</span>
+              ) : outputScript ? (
+                <pre className="text-xs text-on-surface font-sans leading-relaxed whitespace-pre-wrap">{outputScript}</pre>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center opacity-35 text-center space-y-2 py-20 select-none">
+                  <Video className="text-primary animate-pulse" size={36} />
+                  <h4 className="text-on-surface font-semibold text-sm">Video Script Playground</h4>
+                  <p className="text-on-surface-variant text-xs max-w-xs leading-relaxed">Enter a script topic below and press Run to compile visual layouts, hooks, and narration outlines.</p>
                 </div>
-                <input
-                  id="pf-budget"
-                  type="range"
-                  min="1" max="100" step="1"
-                  value={preFlightBudget}
-                  onChange={(e) => setPreFlightBudget(parseFloat(e.target.value))}
-                  className="w-full accent-primary h-1 bg-surface-variant rounded-lg appearance-none cursor-pointer"
-                />
-                <div className="flex justify-between mt-1 text-[10px] text-on-surface-variant font-mono">
-                  <span>$1</span>
-                  <span>Est. {(preFlightBudget * 5000).toLocaleString()} tokens</span>
-                  <span>$100</span>
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="pf-model" className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block mb-2">Model Outcomes</label>
-                <select
-                  id="pf-model"
-                  value={preFlightModel}
-                  onChange={(e) => setPreFlightModel(e.target.value)}
-                  className="w-full bg-surface-container-low border border-cyber-border rounded-lg px-3 py-2.5 text-sm text-on-surface outline-none focus:border-primary/60 transition-colors font-mono"
-                >
-                  <option value="auto">Fast & Balanced (Auto-Route)</option>
-                  <option value="Nemotron-3-Ultra">Deep Thinking (Logic & Planning)</option>
-                  <option value="DeepSeek-V4-Pro">Developer Mode (Code & Reasoning)</option>
-                  <option value="Gemini Flash">Ultra Speed (Gemini Flash)</option>
-                </select>
-              </div>
-
-              <button
-                onClick={executeWorkflow}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-primary text-on-primary-fixed font-mono text-[13px] font-bold uppercase tracking-wider hover:brightness-110 transition-all mt-4 shadow-[0_4px_16px_-4px_rgba(var(--primary-rgb),0.4)]"
-              >
-                <Play size={16} fill="currentColor" />
-                Initialize Pipeline
-              </button>
+              )}
             </div>
           </div>
         </div>
-      )}
+
+        {/* Input Prompter Footer */}
+        <footer className="shrink-0 bg-surface-container-lowest/40 border-t border-cyber-border/30 px-6 py-4 flex gap-4 items-center z-20">
+          <div className="relative flex-1">
+            <textarea
+              rows={2}
+              value={promptInput}
+              onChange={(e) => setPromptInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleGenerateScript();
+                }
+              }}
+              placeholder="What topic do you want this assistant to build a video script for? (e.g. 'A 30-second TikTok on Next.js 15 routing')..."
+              className="w-full bg-surface-elevated border border-cyber-border px-4 py-2.5 rounded-lg text-xs text-on-surface outline-none focus:border-primary transition-colors font-sans resize-none leading-normal"
+            />
+          </div>
+          <button
+            onClick={handleGenerateScript}
+            disabled={executing || !promptInput.trim()}
+            className="px-6 py-4 bg-primary text-on-primary-fixed hover:brightness-110 rounded-lg font-mono text-xs font-bold uppercase tracking-widest transition-all disabled:opacity-40 flex items-center gap-2 cursor-pointer h-12 shrink-0"
+          >
+            {executing ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+            Run
+          </button>
+        </footer>
+      </div>
     </div>
   );
 }
