@@ -1,9 +1,9 @@
 import {
-  LayoutDashboard,
-  Workflow,
-  Database,
-  Network,
   Target,
+  Megaphone,
+  Search,
+  Inbox,
+  Sliders,
   ShieldAlert,
   type LucideIcon,
 } from 'lucide-react';
@@ -15,10 +15,11 @@ export interface NavItem {
 }
 
 export const NAVIGATION: NavItem[] = [
-  { name: 'Workspace', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Agent Registry', href: '/agents', icon: Network },
-  { name: 'Workflow Automation', href: '/workflow', icon: Workflow },
-  { name: 'Memory', href: '/memory', icon: Database },
   { name: 'Hunt Center', href: '/hunt', icon: Target },
-  { name: 'Enterprise', href: '/admin', icon: ShieldAlert },
+  { name: 'Copywriter AI', href: '/campaigns', icon: Megaphone },
+  { name: 'Research Scout', href: '/leads', icon: Search },
+  { name: 'Review Queue', href: '/review', icon: Inbox },
+  { name: 'System Playground', href: '/agents', icon: Sliders },
+  { name: 'Enterprise Settings', href: '/admin', icon: ShieldAlert },
 ];
+

@@ -47,7 +47,7 @@ export async function GET() {
       supabase.from("agents").select("status"),
       supabase.from("settings").select("agent_concurrency_limit").single(),
       supabase.from("logs").select("id", { count: "exact", head: true }).eq("level", "error").gte("created_at", dayAgo),
-      supabase.from("hunt_leads").select("website_uri, created_at"),
+      supabase.from("hunt_leads").select("website_uri, created_at, status"),
       supabase.from("memories").select("id", { count: "exact", head: true }).eq("agent_label", "HUNT_ENGINE"),
     ]);
 
@@ -57,7 +57,7 @@ export async function GET() {
     const agents = agentRows.data ?? [];
     const leads = leadRows.data ?? [];
 
-    const stats: SystemStats = {
+    const stats = {
       tokens: {
         lifetime: events.reduce((s, e) => s + (e.tokens_estimate ?? 0), 0),
         today: events
@@ -93,6 +93,7 @@ export async function GET() {
         with_website: leads.filter(l => l.website_uri && l.website_uri !== 'No website found').length,
         hunts_run: huntsRun.count ?? 0,
       },
+      ready_to_review: leads.filter(l => l.status === 'ready_to_review').length,
     };
 
     return NextResponse.json({ success: true, data: stats });

@@ -11,12 +11,31 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [email, setEmail] = useState<string | null>(null);
+  const [reviewCount, setReviewCount] = useState<number>(0);
 
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
       setEmail(user?.email ?? null);
     });
+
+    const fetchReviewCount = async () => {
+      try {
+        const res = await fetch('/api/stats');
+        const json = await res.json();
+        if (json.success && json.data) {
+          // stats has agents, workflows, leads, let's read ready_to_review from status count or stats.leads.ready_to_review
+          // We will modify /api/stats to include a ready_to_review count
+          setReviewCount(json.data.workflows?.ready_to_review || json.data.ready_to_review || 0);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    fetchReviewCount();
+    const timer = setInterval(fetchReviewCount, 8000);
+    return () => clearInterval(timer);
   }, []);
 
   const handleSignOut = async () => {
@@ -34,8 +53,8 @@ export function Sidebar() {
             <TerminalSquare size={18} className="text-primary" />
           </div>
           <div>
-            <h1 className="font-bold text-on-surface text-lg tracking-tight leading-none">IAS OS</h1>
-            <p className="font-mono text-on-surface-variant text-[10px] uppercase tracking-wider opacity-70">Visual AI Engine</p>
+            <h1 className="font-bold text-on-surface text-[15px] tracking-tight leading-none">Imam Agent</h1>
+            <p className="font-mono text-primary text-[9px] uppercase tracking-wider mt-1 font-bold">Studio V2</p>
           </div>
         </div>
       </div>
@@ -44,16 +63,14 @@ export function Sidebar() {
         {NAVIGATION.map((item) => {
           const isActive = pathname === item.href;
           const Icon = item.icon;
-          const isDisabled = item.name === 'Enterprise';
+          const isReview = item.name === 'Review Queue';
           
           return (
             <Link
               key={item.href}
-              href={isDisabled ? '#' : item.href}
+              href={item.href}
               aria-current={isActive ? 'page' : undefined}
-              title={isDisabled ? 'Coming Soon' : undefined}
               className={`relative flex items-center gap-3 px-3 py-2 rounded-lg font-medium transition-all duration-150 group ${
-                isDisabled ? 'opacity-50 cursor-not-allowed text-on-surface-variant' :
                 isActive
                   ? 'text-primary bg-primary/10 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]'
                   : 'text-on-surface-variant hover:bg-surface-variant/40 hover:text-on-surface'
@@ -67,8 +84,10 @@ export function Sidebar() {
                 className={isActive ? 'text-primary' : 'opacity-70 group-hover:opacity-100 transition-opacity'}
               />
               <span className="font-mono text-[13px] tracking-wide flex-1">{item.name}</span>
-              {isDisabled && (
-                <span className="font-mono text-[9px] bg-surface-variant/50 px-1.5 py-0.5 rounded text-on-surface-variant group-hover:text-primary transition-colors">SOON</span>
+              {isReview && reviewCount > 0 && (
+                <span className="font-mono text-[10px] bg-primary text-on-primary-fixed px-1.5 py-0.5 rounded-full font-bold ml-auto animate-pulse">
+                  {reviewCount}
+                </span>
               )}
             </Link>
           );
@@ -107,3 +126,4 @@ export function Sidebar() {
     </nav>
   );
 }
+

@@ -60,7 +60,7 @@ export default function LoginPage() {
             <TerminalSquare size={22} className="text-primary" />
           </div>
           <div>
-            <h1 className="font-bold text-on-surface text-xl tracking-tight leading-none">IAS OS</h1>
+            <h1 className="font-bold text-on-surface text-lg tracking-tight leading-none">Imam Agent Studio</h1>
             <p className="font-mono text-on-surface-variant text-[10px] uppercase tracking-wider opacity-70 mt-1">
               Operator Authentication
             </p>

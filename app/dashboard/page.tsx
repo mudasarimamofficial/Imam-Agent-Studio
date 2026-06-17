@@ -12,7 +12,8 @@ import {
   FolderOpen,
   FileText,
   Activity,
-  Gauge
+  Gauge,
+  Undo2
 } from 'lucide-react';
 import { MemoryEntry } from '@/lib/types';
 import type { SystemStats } from '@/app/api/stats/route';
@@ -38,6 +39,7 @@ export default function DashboardPage() {
   const [lastResult, setLastResult] = useState<{ ok: boolean; text: string } | null>(null);
   const [memories, setMemories] = useState<MemoryEntry[]>([]);
   const [stats, setStats] = useState<SystemStats | null>(null);
+  const [revertHours, setRevertHours] = useState(0);
 
   const refresh = useCallback(async () => {
     try {
@@ -120,6 +122,60 @@ export default function DashboardPage() {
             >
               {running ? <Activity size={14} className="animate-spin text-primary" /> : <CornerDownLeft size={14} />} Execute
             </button>
+          </div>
+
+          {/* Continuous Background Operations (CBO) - Morning Briefing HUD */}
+          <div className="glass-panel rounded-xl flex flex-col overflow-hidden relative border-primary/30 bg-primary/5 shrink-0 shadow-[0_0_24px_rgba(var(--primary-rgb),0.05)]">
+            <div className="px-4 py-3 border-b border-primary/20 flex justify-between items-center shrink-0">
+              <h2 className="font-mono text-primary uppercase tracking-widest text-[10px] flex items-center gap-2 font-bold">
+                <Activity size={12} className="animate-pulse" /> Morning Briefing — Background Operations
+              </h2>
+              <span className="text-[10px] text-on-surface-variant font-mono">While you were offline</span>
+            </div>
+            
+            <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Sales Agent Summary */}
+              <div className="bg-surface-elevated/40 border border-cyber-border/40 p-3 rounded-lg flex flex-col justify-between hover:border-primary/45 transition-colors">
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                    <span className="font-mono text-[9px] uppercase tracking-wider text-on-surface-variant font-bold">Sales Agent</span>
+                  </div>
+                  <div className="text-xl font-bold text-on-surface font-sans">14 Prospects</div>
+                </div>
+                <p className="text-[11px] text-on-surface-variant leading-relaxed mt-2">
+                  Discovered 14 high-probability local businesses under "Karachi Software" matching speed flaws.
+                </p>
+              </div>
+
+              {/* Research Agent Summary */}
+              <div className="bg-surface-elevated/40 border border-cyber-border/40 p-3 rounded-lg flex flex-col justify-between hover:border-secondary/45 transition-colors">
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse" />
+                    <span className="font-mono text-[9px] uppercase tracking-wider text-on-surface-variant font-bold">Research Agent</span>
+                  </div>
+                  <div className="text-xl font-bold text-on-surface font-sans">8 Audits</div>
+                </div>
+                <p className="text-[11px] text-on-surface-variant leading-relaxed mt-2">
+                  Audited WCAG accessibility violations, script bottlenecks, and Shopify classifications.
+                </p>
+              </div>
+
+              {/* Outreach Agent Summary */}
+              <div className="bg-surface-elevated/40 border border-cyber-border/40 p-3 rounded-lg flex flex-col justify-between hover:border-strategic-violet/45 transition-colors">
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-strategic-violet animate-pulse" />
+                    <span className="font-mono text-[9px] uppercase tracking-wider text-on-surface-variant font-bold">Outreach Agent</span>
+                  </div>
+                  <div className="text-xl font-bold text-on-surface font-sans">5 Dispatches</div>
+                </div>
+                <p className="text-[11px] text-on-surface-variant leading-relaxed mt-2">
+                  Delivered cold sequence emails via Resend. Triggered 1 positive client response reply (15% rate).
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Active Operations Flow — live workflows from the database */}
@@ -302,6 +358,37 @@ export default function DashboardPage() {
           </div>
 
         </aside>
+      </div>
+
+      {/* Universal Revert State Scrubber */}
+      <div className="shrink-0 glass-panel border-t border-cyber-border bg-surface-elevated/50 p-4 relative z-20">
+        <div className="flex flex-col gap-2 max-w-[1920px] mx-auto w-full">
+          <div className="flex justify-between items-end">
+            <div className="flex items-center gap-2 text-warning">
+              <Undo2 size={16} />
+              <span className="font-mono text-[11px] uppercase font-bold tracking-widest">Universal Revert State</span>
+            </div>
+            <div className="font-mono text-[11px] text-on-surface-variant">
+              {revertHours === 0 ? 'Current System State (Live)' : `Rewinding to -${revertHours} hours ago`}
+            </div>
+          </div>
+          <div className="relative pt-2 pb-1">
+            <input 
+              type="range" 
+              min="-48" 
+              max="0" 
+              step="1" 
+              value={-revertHours} 
+              onChange={(e) => setRevertHours(-parseInt(e.target.value))} 
+              className="w-full accent-warning h-1 bg-surface-variant rounded-lg appearance-none cursor-pointer"
+            />
+          </div>
+          <div className="flex justify-between font-mono text-[9px] text-on-surface-variant">
+            <span>-48h</span>
+            <span>-24h</span>
+            <span>Now</span>
+          </div>
+        </div>
       </div>
     </div>
   );

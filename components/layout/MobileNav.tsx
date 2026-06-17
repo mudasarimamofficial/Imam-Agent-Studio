@@ -36,7 +36,7 @@ export function MobileNav() {
       <header className="md:hidden flex justify-between items-center px-4 h-16 w-full sticky top-0 z-50 glass-nav">
         <div className="flex items-center gap-2">
           <TerminalSquare size={18} className="text-primary" />
-          <span className="font-bold text-on-surface">IAS OS</span>
+          <span className="font-bold text-on-surface">Imam Agent Studio</span>
         </div>
         <button
           onClick={() => setOpen(true)}
@@ -58,7 +58,7 @@ export function MobileNav() {
             <div className="flex items-center justify-between px-5 mb-6">
               <div className="flex items-center gap-2">
                 <TerminalSquare size={18} className="text-primary" />
-                <span className="font-bold text-on-surface text-lg">IAS OS</span>
+                <span className="font-bold text-on-surface text-lg">Imam Agent Studio</span>
               </div>
               <button onClick={() => setOpen(false)} aria-label="Close navigation" className="text-on-surface-variant hover:text-on-surface">
                 <X size={20} />

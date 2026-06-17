@@ -71,6 +71,11 @@ export default function WorkflowPage() {
   const [running, setRunning] = useState(false);
   const [workflowStatus, setWorkflowStatus] = useState<string | null>(null);
 
+  // Pre-Flight Modal state
+  const [preFlightOpen, setPreFlightOpen] = useState(false);
+  const [preFlightBudget, setPreFlightBudget] = useState<number>(5);
+  const [preFlightModel, setPreFlightModel] = useState("auto");
+
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
 
@@ -121,6 +126,7 @@ export default function WorkflowPage() {
 
   const executeWorkflow = async () => {
     if (running) return;
+    setPreFlightOpen(false);
     setRunning(true);
     setWorkflowStatus("Booting AI Pipeline Engine... Please stand by.");
 
@@ -129,9 +135,15 @@ export default function WorkflowPage() {
     const highlightInterval = setInterval(() => {
       setNodes((nds) => nds.map((node, i) => {
         if (i === currentIdx % nds.length) {
-          return { ...node, style: { ...node.style, outline: '2px solid #a3e635', outlineOffset: '4px', boxShadow: '0 0 20px rgba(163, 230, 53, 0.4)', transition: 'all 0.3s' } };
+          const costTick = (Math.random() * 0.05).toFixed(4);
+          const activeModelName = preFlightModel === 'auto' ? 'Nemotron-3-Ultra' : preFlightModel;
+          return { 
+            ...node, 
+            data: { ...node.data, currentCost: costTick, activeModel: activeModelName },
+            style: { ...node.style, outline: '2px solid #a3e635', outlineOffset: '4px', boxShadow: '0 0 20px rgba(163, 230, 53, 0.4)', transition: 'all 0.3s' } 
+          };
         }
-        return { ...node, style: { ...node.style, outline: 'none', boxShadow: 'none' } };
+        return { ...node, data: { ...node.data, currentCost: undefined, activeModel: undefined }, style: { ...node.style, outline: 'none', boxShadow: 'none' } };
       }));
       currentIdx++;
     }, 800);
@@ -166,11 +178,24 @@ export default function WorkflowPage() {
       setWorkflowStatus("This task took too long and stopped. Tap to try again.");
     } finally {
       clearInterval(highlightInterval);
-      setNodes((nds) => nds.map(node => ({ ...node, style: { ...node.style, outline: 'none', boxShadow: 'none' } })));
+      setNodes((nds) => nds.map(node => ({ ...node, data: { ...node.data, currentCost: undefined, activeModel: undefined }, style: { ...node.style, outline: 'none', boxShadow: 'none' } })));
       setRunning(false);
       setTimeout(() => setWorkflowStatus(null), 6000);
     }
   };
+
+  const deleteNode = useCallback((nodeId: string) => {
+    setNodes((nds) => nds.filter((n) => n.id !== nodeId));
+    setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
+  }, [setNodes, setEdges]);
+
+  const nodesWithCallbacks = nodes.map(node => ({
+    ...node,
+    data: {
+      ...node.data,
+      onDelete: deleteNode
+    }
+  }));
 
   return (
     <div className="flex-1 flex flex-col h-full relative overflow-hidden bg-background">
@@ -217,7 +242,7 @@ export default function WorkflowPage() {
               <div className="flex flex-col px-2">
                 <span className="text-sm font-semibold text-on-surface">Orchestration_Alpha_01</span>
                 <span className="text-[11px] font-mono text-on-surface-variant flex items-center gap-1">
-                  <Eye size={11} /> Interactive DAG Canvas
+                  <Eye size={11} /> Visual Task Builder Canvas
                 </span>
               </div>
             </div>
@@ -229,7 +254,7 @@ export default function WorkflowPage() {
                 </span>
               )}
               <button
-                onClick={executeWorkflow}
+                onClick={() => setPreFlightOpen(true)}
                 disabled={running}
                 className={`glass-panel rounded-lg px-4 py-2 font-mono text-[12px] font-bold transition-all flex items-center gap-2 disabled:opacity-50 ${running ? 'text-secondary' : 'text-primary hover:brightness-110'}`}
               >
@@ -240,7 +265,7 @@ export default function WorkflowPage() {
           </div>
 
           <ReactFlow
-            nodes={nodes}
+            nodes={nodesWithCallbacks}
             edges={edges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
@@ -284,6 +309,76 @@ export default function WorkflowPage() {
           )}
         </section>
       </main>
+
+      {/* Pre-Flight Execution Modal */}
+      {preFlightOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-obsidian-deep/70 backdrop-blur-sm animate-fade-in"
+          onClick={() => setPreFlightOpen(false)}
+        >
+          <div
+            className="glass-elevated rounded-2xl w-full max-w-md p-6 relative overflow-hidden transition-all duration-300 border border-cyber-border/50"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between mb-5">
+              <div>
+                <h3 className="text-lg font-bold text-on-surface flex items-center gap-2">
+                  <Cpu size={18} className="text-primary" /> Pre-Flight Execution
+                </h3>
+                <p className="font-mono text-[11px] text-on-surface-variant mt-1">Configure parameters before pipeline execution</p>
+              </div>
+              <button onClick={() => setPreFlightOpen(false)} className="text-on-surface-variant hover:text-on-surface" aria-label="Close">
+                <span className="text-xl leading-none">&times;</span>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <div className="flex justify-between mb-2">
+                  <label htmlFor="pf-budget" className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">Pipeline Budget Cap</label>
+                  <span className="font-mono text-[11px] text-primary font-bold">${preFlightBudget.toFixed(2)}</span>
+                </div>
+                <input
+                  id="pf-budget"
+                  type="range"
+                  min="1" max="100" step="1"
+                  value={preFlightBudget}
+                  onChange={(e) => setPreFlightBudget(parseFloat(e.target.value))}
+                  className="w-full accent-primary h-1 bg-surface-variant rounded-lg appearance-none cursor-pointer"
+                />
+                <div className="flex justify-between mt-1 text-[10px] text-on-surface-variant font-mono">
+                  <span>$1</span>
+                  <span>Est. {(preFlightBudget * 5000).toLocaleString()} tokens</span>
+                  <span>$100</span>
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="pf-model" className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider block mb-2">Model Outcomes</label>
+                <select
+                  id="pf-model"
+                  value={preFlightModel}
+                  onChange={(e) => setPreFlightModel(e.target.value)}
+                  className="w-full bg-surface-container-low border border-cyber-border rounded-lg px-3 py-2.5 text-sm text-on-surface outline-none focus:border-primary/60 transition-colors font-mono"
+                >
+                  <option value="auto">Fast & Balanced (Auto-Route)</option>
+                  <option value="Nemotron-3-Ultra">Deep Thinking (Logic & Planning)</option>
+                  <option value="DeepSeek-V4-Pro">Developer Mode (Code & Reasoning)</option>
+                  <option value="Gemini Flash">Ultra Speed (Gemini Flash)</option>
+                </select>
+              </div>
+
+              <button
+                onClick={executeWorkflow}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-primary text-on-primary-fixed font-mono text-[13px] font-bold uppercase tracking-wider hover:brightness-110 transition-all mt-4 shadow-[0_4px_16px_-4px_rgba(var(--primary-rgb),0.4)]"
+              >
+                <Play size={16} fill="currentColor" />
+                Initialize Pipeline
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

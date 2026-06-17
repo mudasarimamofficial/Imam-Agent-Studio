@@ -16,6 +16,9 @@ export default function MemoryPage() {
   const [search, setSearch] = useState("");
   const [activeAgent, setActiveAgent] = useState<string | null>(null);
 
+  type MemoryType = 'All' | 'Project' | 'Founder' | 'Organizational';
+  const [memoryType, setMemoryType] = useState<MemoryType>('All');
+
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
 
@@ -52,16 +55,28 @@ export default function MemoryPage() {
     return () => clearInterval(interval);
   }, [fetchMemory, search]);
 
+  // Mock deterministic memory type assignment
+  const typeFiltered = useMemo(() => {
+    return memories.filter(m => {
+      if (memoryType === 'All') return true;
+      const charCode = m.id.charCodeAt(0) || 0;
+      if (memoryType === 'Project' && charCode % 3 === 0) return true;
+      if (memoryType === 'Founder' && charCode % 3 === 1) return true;
+      if (memoryType === 'Organizational' && charCode % 3 === 2) return true;
+      return false;
+    });
+  }, [memories, memoryType]);
+
   // Build graph nodes from real data: one node per agent_label, sized by count.
   const agents = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const m of memories) counts.set(m.agent_label, (counts.get(m.agent_label) ?? 0) + 1);
+    for (const m of typeFiltered) counts.set(m.agent_label, (counts.get(m.agent_label) ?? 0) + 1);
     return Array.from(counts.entries())
       .map(([label, count], i) => ({ label, count, color: PALETTE[i % PALETTE.length] }))
       .sort((a, b) => b.count - a.count);
-  }, [memories]);
+  }, [typeFiltered]);
 
-  const filtered = activeAgent ? memories.filter((m) => m.agent_label === activeAgent) : memories;
+  const filtered = activeAgent ? typeFiltered.filter((m) => m.agent_label === activeAgent) : typeFiltered;
 
   const graphData = useMemo(() => {
     const nodes: any[] = [{ id: 'core', label: 'CORE', count: 100, color: '#a3e635', isCore: true }];
@@ -146,8 +161,21 @@ export default function MemoryPage() {
               <Database size={12} className="text-telemetry-blue" />
               Vector Knowledge Graph
             </div>
-            <div>{agents.length} sources · {memories.length} memories</div>
+            <div>{agents.length} sources · {typeFiltered.length} memories</div>
             <div className="text-on-surface-variant/60 mt-1">Click a node to filter the stream</div>
+
+            {/* HLTM Toggles */}
+            <div className="flex gap-2 mt-3">
+              {['All', 'Project', 'Founder', 'Organizational'].map(t => (
+                <button
+                  key={t}
+                  onClick={() => setMemoryType(t as MemoryType)}
+                  className={`px-2 py-1 rounded text-[10px] font-bold uppercase transition-colors ${memoryType === t ? 'bg-telemetry-blue/20 text-telemetry-blue border border-telemetry-blue/40' : 'bg-surface-elevated/80 text-on-surface-variant hover:text-on-surface border border-cyber-border'}`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="absolute inset-0 z-10 flex items-center justify-center">
