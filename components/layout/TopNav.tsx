@@ -51,7 +51,7 @@ export function TopNav({ title, tabs, activeTab }: TopNavProps) {
         </div>
 
         <Link
-          href="/agents"
+          href="/library"
           className="inline-flex items-center gap-1.5 bg-primary text-on-primary-fixed px-4 py-1.5 rounded-md font-mono text-[13px] font-bold hover:brightness-110 transition-all shadow-[0_4px_16px_-4px_rgba(var(--primary-rgb),0.4)]"
         >
           Deploy Agent <ArrowRight size={13} />

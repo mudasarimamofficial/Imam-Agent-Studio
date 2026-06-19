@@ -1,614 +1,371 @@
 "use client";
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { TopNav } from '@/components/layout/TopNav';
-import {
-  Radar, MapPin, Globe, Database, Search, X, Sparkles, Loader2, 
-  Copy, Check, Star, Users, ShieldAlert, ArrowUpRight, HelpCircle, Info
+import { 
+  Users, Mail, Search, Sparkles, Check, Database, Copy, X, Loader2, ExternalLink, MessageSquare, Briefcase
 } from 'lucide-react';
-import { HuntResult } from '@/lib/types';
-import type { SystemStats } from '@/app/api/stats/route';
 
-function scoreColor(score: number): string {
-  if (score >= 70) return 'text-primary';
-  if (score >= 45) return 'text-warning';
-  return 'text-on-surface-variant';
+interface Lead {
+  id: string;
+  place_id: string;
+  business_name: string;
+  website_url: string;
+  phone_number: string;
+  email: string;
+  instagram_handle: string;
+  has_email: boolean;
+  has_whatsapp: boolean;
+  has_instagram: boolean;
+  msg_email: string | null;
+  msg_whatsapp: string | null;
+  msg_instagram: string | null;
+  website_text_snippet: string;
+  discovery_error: string | null;
+  tech_stack: any;
+  audit_pain_points: string | null;
+  status: string;
+  rating: string;
+  user_rating_count: number;
+  score: number;
+  created_at: string;
+  updated_at: string;
+  replied_at: string | null;
 }
 
-export default function HuntPage() {
-  const [query, setQuery] = useState("Software companies in Karachi");
-  const [results, setResults] = useState<HuntResult[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [huntStats, setHuntStats] = useState<SystemStats['hunt'] | null>(null);
+export default function HuntCenterPage() {
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  
+  const [selected, setSelected] = useState<Lead | null>(null);
+  const [enriching, setEnriching] = useState(false);
+  const [generatingBrain, setGeneratingBrain] = useState(false);
+  
+  const [emailEdit, setEmailEdit] = useState("");
+  const [copiedText, setCopiedText] = useState(false);
 
-  // Live Terminal Logs
-  const [terminalLogs, setTerminalLogs] = useState<string[]>([
-    "> initialize_core_systems()",
-    "> ready for tasking."
-  ]);
-
-  // Selected lead configuration
-  const [selected, setSelected] = useState<HuntResult | null>(null);
-  const [pitch, setPitch] = useState<string | null>(null);
-  const [pitchLoading, setPitchLoading] = useState(false);
-  const [pitchError, setPitchError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [pushingCrm, setPushingCrm] = useState(false);
-  const [crmMessage, setCrmMessage] = useState<string | null>(null);
-
-  // Tooltip helper state
-  const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
-
-  // Pre-Flight financial safety states
-  const [preFlightOpen, setPreFlightOpen] = useState(false);
-  const [preFlightBudget, setPreFlightBudget] = useState(5.0);
-  const [preFlightModel, setPreFlightModel] = useState("auto");
-  const [systemInstructions, setSystemInstructions] = useState("System rules: Draft high-converting cold email copy targeting the identified CMS deficiencies and accessibility pain points.");
-  const [maxTokens, setMaxTokens] = useState(4000);
-
-  const openLead = (lead: HuntResult) => {
-    setSelected(lead);
-    setPitch(null);
-    setPitchError(null);
-    setCopied(false);
-    setCrmMessage(null);
-    setTerminalLogs(prev => [...prev, `> select_target(name="${lead.business_name}")`]);
-  };
-
-  const generatePitch = async () => {
-    if (!selected || pitchLoading) return;
-    setPitchLoading(true);
-    setPitchError(null);
-    setPitch(null);
-    setTerminalLogs(prev => [...prev, `> init_pitch_sequence(target="${selected.business_name}")`]);
-    
+  const fetchLeads = useCallback(async () => {
     try {
-      const res = await fetch('/api/hunt/pitch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(selected),
-      });
-
-      if (!res.body) throw new Error("No response body");
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let done = false;
-
-      while (!done) {
-        const { value, done: doneReading } = await reader.read();
-        done = doneReading;
-        if (value) {
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split('\n');
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                if (data.type === 'log') {
-                  setTerminalLogs(prev => [...prev, `> ${data.msg}`]);
-                } else if (data.type === 'result') {
-                  setPitch(data.pitch);
-                } else if (data.type === 'error') {
-                  setPitchError(data.msg);
-                }
-              } catch (e) {
-                // Ignore partial JSON parsing errors
-              }
-            }
-          }
-        }
-      }
-    } catch {
-      setPitchError('Network error generating pitch');
-      setTerminalLogs(prev => [...prev, '> [ERROR] Network failure during stream.']);
-    } finally {
-      setPitchLoading(false);
-    }
-  };
-
-  const copyPitch = async () => {
-    if (!pitch) return;
-    try {
-      await navigator.clipboard.writeText(pitch);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch { /* clipboard unavailable */ }
-  };
-
-  const refreshStats = useCallback(async () => {
-    try {
-      const res = await fetch('/api/stats');
+      const res = await fetch(`/api/leads?status=${statusFilter}&query=${searchQuery}`);
       const json = await res.json();
-      if (json.data?.hunt) setHuntStats(json.data.hunt);
-    } catch (e) {
-      console.error(e);
-    }
-  }, []);
-
-  useEffect(() => { refreshStats(); }, [refreshStats]);
-
-  const performSearch = async () => {
-    setPreFlightOpen(false);
-    setLoading(true);
-    setSelected(null);
-    setPitch(null);
-    setTerminalLogs(prev => [...prev, `> execute_hunt(query="${query}")`, '> [WORKING] Calling Google Places API...']);
-    try {
-      const res = await fetch('/api/hunt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query })
-      });
-      const data = await res.json();
-      const extracted = data.data || [];
-      setResults(extracted);
-      setTerminalLogs(prev => [...prev, `> [SUCCESS] Extracted ${extracted.length} new profiles.`]);
-    } catch (e) {
-      console.error(e);
-      setTerminalLogs(prev => [...prev, '> [ERROR] Search execution failed.']);
+      if (json.success) {
+        setLeads(json.data || []);
+      }
+    } catch (err) {
+      console.error(err);
     } finally {
       setLoading(false);
-      refreshStats();
     }
+  }, [statusFilter, searchQuery]);
+
+  useEffect(() => {
+    fetchLeads();
+  }, [fetchLeads]);
+
+  const openLeadDetails = (lead: Lead) => {
+    setSelected(lead);
+    setEmailEdit(lead.msg_email || "");
   };
 
-  const exportToCSV = () => {
-    if (results.length === 0) return;
-    const headers = ['Name', 'Score', 'Address', 'Website', 'Rating'];
-    const csvRows = [headers.join(',')];
-    
-    for (const r of results) {
-      const name = `"${r.business_name.replace(/"/g, '""')}"`;
-      const score = r.score ?? 0;
-      const address = `"${r.location.replace(/"/g, '""')}"`;
-      const website = `"${(r.website_uri && r.website_uri !== 'No website found') ? r.website_uri : ''}"`;
-      const rating = r.rating ?? 0;
-      csvRows.push([name, score, address, website, rating].join(','));
-    }
-    
-    const csvString = csvRows.join('\n');
-    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `leads_export_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
-  const pushToCRM = async () => {
-    if (!selected) return;
-    setPushingCrm(true);
-    setCrmMessage(null);
-    setTerminalLogs(prev => [...prev, `> [CRM] Initiating webhook sync for target: ${selected.business_name}...`]);
+  const handleEnrich = async (leadId: string) => {
+    setEnriching(true);
     try {
-      await new Promise(r => setTimeout(r, 1200));
-      setTerminalLogs(prev => [...prev, `> [CRM] Synced successfully to HubSpot CRM.`]);
-      setCrmMessage("Synced contact details successfully.");
-    } catch {
-      setCrmMessage("Sync failed.");
+      const res = await fetch('/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lead_id: leadId, action: 'enrich' })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setSelected(json.data);
+        await fetchLeads();
+      }
+    } catch (err) {
+      console.error(err);
     } finally {
-      setPushingCrm(false);
+      setEnriching(false);
     }
   };
 
-  // Heuristic mock parser for selected target details
-  const getSelectedHeuristics = (lead: HuntResult) => {
-    const seed = lead.place_id || lead.business_name;
-    const charCode = seed.charCodeAt(0) || 10;
-    const isShopify = lead.business_name.toLowerCase().includes("store") || lead.business_name.toLowerCase().includes("boutique") || charCode % 2 === 0;
-    const platform = isShopify ? "Shopify" : "WordPress";
-    const missingAlt = (charCode + 4) % 12 + 2;
-    const missingAria = charCode % 6;
-    const scriptTags = (charCode * 3) % 25 + 12;
-    const totalImages = (charCode * 2) % 30 + 15;
-    
-    return {
-      platform,
-      missingAlt,
-      missingAria,
-      scriptTags,
-      totalImages,
-      painPoints: `Website is powered by ${platform}. Alt image descriptors are missing on ${missingAlt} components. Slow rendering cycles are causing a ${platform} load bottleneck.`
-    };
+  const handleBrain = async (leadId: string) => {
+    setGeneratingBrain(true);
+    try {
+      const res = await fetch('/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lead_id: leadId, action: 'brain' })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setSelected(json.data);
+        setEmailEdit(json.data.msg_email || "");
+        await fetchLeads();
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setGeneratingBrain(false);
+    }
   };
 
-  const activeHeuristics = selected ? getSelectedHeuristics(selected) : null;
+  const handleCopy = () => {
+    navigator.clipboard.writeText(emailEdit);
+    setCopiedText(true);
+    setTimeout(() => setCopiedText(false), 2000);
+  };
 
   return (
-    <div className="flex-1 flex h-full bg-background relative overflow-hidden">
-      {/* 1. LEFT CONFIGURATION PANEL (280px / w-72) */}
-      <aside className="w-72 border-r border-cyber-border/45 bg-surface-elevated/10 shrink-0 flex flex-col h-full overflow-y-auto p-5 space-y-6 select-none relative z-20">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="w-2 h-2 rounded-full bg-agent-active-glow animate-pulse"></span>
-            <span className="font-mono text-[10px] text-agent-active-glow uppercase tracking-wider font-bold">Parameters Panel</span>
-          </div>
-          <h3 className="font-sans text-sm font-bold text-on-surface">Client Hunter Config</h3>
-          <p className="text-[10px] text-on-surface-variant font-mono mt-0.5">Configure system rules &amp; budget limits</p>
-        </div>
+    <div className="flex-1 flex flex-col h-full bg-background relative overflow-hidden">
+      <TopNav title="Ultimate Hunt Center" tabs={['Pipeline Roster']} activeTab="Pipeline Roster" />
 
-        {/* System Instructions */}
-        <div className="space-y-2">
-          <label htmlFor="hunt-sys-instructions" className="font-mono text-[9px] text-on-surface-variant uppercase tracking-wider block">System Instructions</label>
-          <textarea
-            id="hunt-sys-instructions"
-            value={systemInstructions}
-            onChange={(e) => setSystemInstructions(e.target.value)}
-            rows={7}
-            className="w-full bg-surface-container/60 border border-cyber-border rounded-xl p-3 text-xs text-on-surface outline-none focus:border-primary/50 transition-colors resize-none leading-relaxed font-sans"
-            placeholder="Instruct the AI on search context and pitch criteria..."
-          />
-        </div>
-
-        {/* Brain Selector */}
-        <div className="space-y-2">
-          <label htmlFor="hunt-model-select" className="font-mono text-[9px] text-on-surface-variant uppercase tracking-wider block">Brain Selector</label>
-          <select
-            id="hunt-model-select"
-            value={preFlightModel}
-            onChange={(e) => setPreFlightModel(e.target.value)}
-            className="w-full bg-surface-container/60 border border-cyber-border rounded-lg px-3 py-2 text-xs text-on-surface outline-none focus:border-primary/50 transition-colors font-mono"
-          >
-            <option value="auto">Fast &amp; Balanced (Gemini Flash)</option>
-            <option value="pro">Deep Thinking (NVIDIA Nemotron Ultra)</option>
-            <option value="flash">Open Source Logic (DeepSeek Pro)</option>
-          </select>
-        </div>
-
-        {/* Safety Controls */}
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <label htmlFor="hunt-budget-cap" className="font-mono text-[9px] text-on-surface-variant uppercase tracking-wider flex items-center gap-1">
-                Task Budget Cap
-              </label>
-              <span className="font-mono text-xs text-primary font-bold">${preFlightBudget.toFixed(1)}</span>
+      <main className="flex-1 overflow-y-auto p-8 lg:p-12">
+        <div className="max-w-[1400px] mx-auto space-y-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+            <div>
+              <h1 className="text-3xl font-bold text-on-surface flex items-center gap-3">
+                <Users className="text-strategic-violet" size={28} />
+                Prospect Intelligence
+              </h1>
+              <p className="text-on-surface-variant mt-2 text-sm">Discover, enrich, and automatically draft hyper-personalized outreach.</p>
             </div>
-            <input
-              id="hunt-budget-cap"
-              type="range"
-              min="1" max="50" step="1"
-              value={preFlightBudget}
-              onChange={(e) => setPreFlightBudget(parseFloat(e.target.value))}
-              className="w-full accent-primary h-1 bg-surface-elevated rounded-lg appearance-none cursor-pointer"
-            />
-            <div className="flex justify-between font-mono text-[8px] text-on-surface-variant">
-              <span>$1.0</span>
-              <span>$50.0</span>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <label htmlFor="hunt-max-tokens" className="font-mono text-[9px] text-on-surface-variant uppercase tracking-wider">
-                Max Token Limit
-              </label>
-              <span className="font-mono text-xs text-secondary font-bold">{maxTokens}</span>
-            </div>
-            <input
-              id="hunt-max-tokens"
-              type="range"
-              min="500" max="8000" step="500"
-              value={maxTokens}
-              onChange={(e) => setMaxTokens(parseInt(e.target.value))}
-              className="w-full accent-secondary h-1 bg-surface-elevated rounded-lg appearance-none cursor-pointer"
-            />
-            <div className="flex justify-between font-mono text-[8px] text-on-surface-variant">
-              <span>500</span>
-              <span>8,000</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="border-t border-cyber-border/30 pt-4 flex flex-col gap-2 font-mono text-[10px] text-on-surface-variant">
-          <div className="flex justify-between">
-            <span>Mode:</span>
-            <span className="text-primary font-bold">OUTBOX_PITCH_AUDIT</span>
-          </div>
-          <div className="flex justify-between">
-            <span>SSRF Guard:</span>
-            <span className="text-secondary font-bold">ENABLED</span>
-          </div>
-        </div>
-      </aside>
-
-      {/* 2. RIGHT EXECUTION CONSOLE (THE MAIN ARENA) */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden relative z-10">
-        <TopNav 
-          title="Hunt Center Playground" 
-          tabs={['Console Feed']} 
-          activeTab="Console Feed"
-        />
-
-        {/* MAIN RUNNER AREA */}
-        <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6 terminal-scroll">
-          
-          {/* Top Section: Prominent Input Prompt */}
-          <div className="glass-panel border-surface-border p-5 space-y-4">
-            <label htmlFor="hunt-query" className="font-mono text-[10px] text-on-surface-variant uppercase tracking-wider block">Target Search Query</label>
-            <div className="flex gap-3 items-center">
-              <div className="relative flex-1">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">
-                  <Search size={15} />
-                </div>
-                <input 
-                  id="hunt-query"
-                  type="text" 
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && setPreFlightOpen(true)}
-                  placeholder="What local client targets do you want this assistant to search and audit? (e.g. boutiques in Karachi)..." 
-                  className="w-full bg-surface-elevated border border-cyber-border pl-10 pr-4 py-2.5 rounded-lg text-sm text-on-surface outline-none focus:border-primary transition-colors font-sans" 
-                />
-              </div>
-              <button 
-                onClick={() => setPreFlightOpen(true)} 
-                disabled={loading}
-                className="px-6 py-2.5 bg-primary text-on-primary-fixed font-mono text-xs font-bold rounded-lg hover:brightness-110 uppercase tracking-widest transition-all disabled:opacity-40 flex items-center gap-2 cursor-pointer"
-              >
-                {loading ? <Loader2 size={14} className="animate-spin" /> : <Radar size={14} />}
-                {loading ? 'Executing...' : 'Execute Task'}
-              </button>
-            </div>
-          </div>
-
-          {/* Center Section: Workspace Columns */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 min-h-[500px]">
-            {/* Target Feed List (Left side of console) */}
-            <div className="lg:col-span-5 glass-panel rounded-xl flex flex-col overflow-hidden border-surface-border h-[500px]">
-              <div className="p-3 border-b border-cyber-border/40 flex justify-between items-center bg-surface-elevated/40">
-                <span className="font-mono text-[9px] text-on-surface font-bold uppercase tracking-wider">Targets Discovered ({results.length})</span>
-                <span className="font-mono text-[9px] text-on-surface-variant">{loading ? 'ACTIVE_SCAN' : 'READY'}</span>
-              </div>
-              
-              <div className="flex-1 overflow-y-auto p-3 space-y-2.5 terminal-scroll">
-                {results.length === 0 && !loading && (
-                  <div className="h-full flex flex-col items-center justify-center text-center opacity-40 p-4 font-mono text-xs">
-                    Target feed is currently empty. Run a query above to discover prospects.
-                  </div>
-                )}
-                {loading && (
-                  <div className="p-8 text-center text-secondary text-xs font-mono animate-pulse">
-                    SCRAPING_GOOGLE_PLACES_METRICS...
-                  </div>
-                )}
-                {results.map((r, i) => {
-                  const isSel = selected?.place_id === r.place_id;
-                  return (
-                    <button
-                      key={r.place_id || i}
-                      onClick={() => openLead(r)}
-                      className={`w-full text-left border rounded-lg p-3 hover-lift transition-all block ${
-                        isSel 
-                          ? 'bg-primary/10 border-primary/50 shadow-[0_0_12px_rgba(var(--primary-rgb),0.1)]' 
-                          : 'bg-surface/40 border-cyber-border/60 hover:border-cyber-border-highlight'
-                      }`}
-                    >
-                      <div className="flex justify-between items-start mb-1">
-                        <span className="font-mono text-[8px] bg-primary/20 text-primary px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Discovered</span>
-                        <span className={`font-mono font-bold text-xs ${scoreColor(r.score ?? 0)}`}>{r.score ?? 0} <span className="text-[9px] text-on-surface-variant font-normal">/100</span></span>
-                      </div>
-                      <h4 className="font-bold text-on-surface text-sm truncate">{r.business_name}</h4>
-                      <p className="text-[10px] text-on-surface-variant truncate mt-0.5">{r.category} • {r.location}</p>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Target Diagnostic & Pitch Output (Right side of console) */}
-            <div className="lg:col-span-7 flex flex-col gap-4 h-[500px]">
-              <div className="glass-panel rounded-xl flex-1 flex flex-col overflow-hidden border-surface-border">
-                <div className="p-3 border-b border-cyber-border/40 flex justify-between items-center bg-surface-elevated/40">
-                  <span className="font-mono text-[9px] text-on-surface font-bold uppercase tracking-wider">Lead Intelligence &amp; AI Copywriter</span>
-                  {selected && <span className="font-mono text-[9px] text-primary">{selected.business_name}</span>}
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-4 space-y-4 terminal-scroll bg-surface-container-lowest/5">
-                  {selected && activeHeuristics ? (
-                    <div className="space-y-4">
-                      {/* Radial Gauge */}
-                      <div className="glass-panel border-cyber-border/40 bg-surface-elevated/30 p-3.5 rounded-xl flex items-center gap-4">
-                        <div className="relative w-16 h-16 shrink-0">
-                          <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                            <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="3" />
-                            <circle 
-                              cx="18" cy="18" r="16" fill="none" 
-                              stroke="var(--color-primary)" 
-                              strokeWidth="3" 
-                              strokeDasharray="100"
-                              strokeDashoffset={100 - (selected.score ?? 50)}
-                              className="transition-all duration-700 ease-out"
-                              strokeLinecap="round"
-                            />
-                          </svg>
-                          <div className="absolute inset-0 flex flex-col items-center justify-center font-mono">
-                            <span className="text-base font-bold text-on-surface leading-none">{selected.score ?? 50}</span>
-                            <span className="text-[7px] text-on-surface-variant leading-none mt-0.5">SCORE</span>
-                          </div>
-                        </div>
-
-                        <div>
-                          <h4 className="font-bold text-on-surface text-xs">Closing Probability Metrics</h4>
-                          <p className="text-[10px] text-on-surface-variant leading-relaxed mt-0.5">Calculated based on speed checkpoints, missing image descriptors, and accessibility violations.</p>
-                        </div>
-                      </div>
-
-                      {/* Tech stack heuristics */}
-                      <div className="grid grid-cols-2 gap-2 font-mono text-[10px]">
-                        <div className="p-2.5 border border-cyber-border/50 bg-surface rounded-lg">
-                          <span className="text-on-surface-variant block">CMS Engine:</span>
-                          <span className="text-primary font-bold">{activeHeuristics.platform}</span>
-                        </div>
-                        <div className="p-2.5 border border-cyber-border/50 bg-surface rounded-lg">
-                          <span className="text-on-surface-variant block">A11y Alt Errors:</span>
-                          <span className="text-error font-bold">{activeHeuristics.missingAlt} / {activeHeuristics.totalImages}</span>
-                        </div>
-                        <div className="p-2.5 border border-cyber-border/50 bg-surface rounded-lg">
-                          <span className="text-on-surface-variant block">JS Script Tags:</span>
-                          <span className="text-secondary font-bold">{activeHeuristics.scriptTags} loaded</span>
-                        </div>
-                        <div className="p-2.5 border border-cyber-border/50 bg-surface rounded-lg">
-                          <span className="text-on-surface-variant block">ARIA Warnings:</span>
-                          <span className="text-warning font-bold">{activeHeuristics.missingAria} issues</span>
-                        </div>
-                      </div>
-
-                      {/* Pitch box */}
-                      {pitchLoading && (
-                        <div className="p-8 text-center text-primary text-xs font-mono animate-pulse">
-                          GENERATING_AI_OUTREACH_PITCH_COPY...
-                        </div>
-                      )}
-                      {pitch && (
-                        <div className="glass-panel border-cyber-border/40 rounded-lg overflow-hidden">
-                          <div className="flex justify-between items-center px-3 py-1.5 border-b border-cyber-border bg-surface-elevated/45">
-                            <span className="font-mono text-[8px] uppercase tracking-wider text-on-surface-variant font-bold">Structured Email Pitch</span>
-                            <button onClick={copyPitch} className="text-primary hover:brightness-110 font-mono text-[9px] uppercase font-bold cursor-pointer">
-                              {copied ? 'Copied' : 'Copy'}
-                            </button>
-                          </div>
-                          <pre className="p-3 text-[10.5px] text-on-surface font-sans leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto terminal-scroll bg-surface-container-lowest/20">{pitch}</pre>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="h-full flex flex-col items-center justify-center opacity-30 text-center space-y-1.5 py-20 select-none">
-                      <Radar className="text-strategic-violet animate-pulse" size={28} />
-                      <h4 className="text-on-surface font-semibold text-xs">Diagnostic Workspace</h4>
-                      <p className="text-on-surface-variant text-[11px] max-w-xs leading-relaxed">Select a target from the feed to run AI diagnostics and draft campaign copy.</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom Section: Clean Quick Action Bar */}
-        <footer className="shrink-0 bg-surface-container-lowest/40 border-t border-cyber-border/30 px-6 py-4 flex items-center justify-between gap-4 z-20">
-          <div className="flex gap-2">
-            {selected && (
-              <button
-                onClick={generatePitch}
-                disabled={pitchLoading}
-                className="flex items-center gap-1.5 px-4 py-2 bg-primary text-on-primary-fixed hover:brightness-110 rounded-md font-mono text-[11px] font-bold uppercase tracking-wider transition-all disabled:opacity-40 cursor-pointer"
-              >
-                <Sparkles size={12} />
-                Generate Pitch
-              </button>
-            )}
-            {pitch && (
-              <button
-                onClick={copyPitch}
-                className="px-4 py-2 bg-surface-elevated border border-cyber-border text-on-surface hover:text-primary rounded-md font-mono text-[11px] font-bold uppercase transition-all cursor-pointer"
-              >
-                Copy Result
-              </button>
-            )}
-          </div>
-
-          <div className="flex gap-2">
-            {results.length > 0 && (
-              <button
-                onClick={exportToCSV}
-                className="px-4 py-2 bg-surface-elevated border border-cyber-border text-on-surface hover:text-secondary rounded-md font-mono text-[11px] font-bold uppercase transition-all cursor-pointer"
-              >
-                Export CSV
-              </button>
-            )}
-            {selected && (
-              <button
-                onClick={pushToCRM}
-                disabled={pushingCrm}
-                className="px-4 py-2 bg-secondary text-on-secondary-fixed hover:brightness-110 rounded-md font-mono text-[11px] font-bold uppercase tracking-wider transition-all disabled:opacity-40 cursor-pointer"
-              >
-                Push to CRM
-              </button>
-            )}
-          </div>
-        </footer>
-      </div>
-
-      {/* Pre-Flight Financial Guards Modal */}
-      {preFlightOpen && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-obsidian-deep/70 backdrop-blur-sm animate-fade-in"
-          onClick={() => setPreFlightOpen(false)}
-        >
-          <div
-            className="glass-elevated rounded-2xl w-full max-w-md p-6 relative overflow-hidden border border-cyber-border/50"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between mb-5">
-              <div>
-                <h3 className="text-lg font-bold text-on-surface flex items-center gap-2">
-                  <ShieldAlert size={18} className="text-primary" /> Pre-Flight Safety Check
-                </h3>
-                <p className="font-mono text-[10px] text-on-surface-variant mt-1">Configure limits before client hunting execution</p>
-              </div>
-              <button onClick={() => setPreFlightOpen(false)} className="text-on-surface-variant hover:text-on-surface cursor-pointer">
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between mb-2">
-                  <label htmlFor="pf-budget" className="font-mono text-[10px] text-on-surface-variant uppercase tracking-wider">Search Budget Cap</label>
-                  <span className="font-mono text-xs text-primary font-bold">${preFlightBudget.toFixed(2)}</span>
-                </div>
+            
+            <div className="flex items-center gap-3 bg-surface-elevated/40 border border-cyber-border rounded-xl p-2 shadow-sm">
+              <div className="relative">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant" />
                 <input
-                  id="pf-budget"
-                  type="range"
-                  min="1" max="50" step="1"
-                  value={preFlightBudget}
-                  onChange={(e) => setPreFlightBudget(parseFloat(e.target.value))}
-                  className="w-full accent-primary h-1.5 bg-surface-variant rounded-lg appearance-none cursor-pointer"
+                  type="text"
+                  placeholder="Search accounts..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="bg-transparent border-none pl-9 pr-4 py-2 text-sm text-on-surface outline-none w-48 md:w-64 focus:ring-0"
                 />
-                <div className="flex justify-between mt-1 text-[9px] text-on-surface-variant font-mono">
-                  <span>$1</span>
-                  <span>Est. {(preFlightBudget * 5000).toLocaleString()} tokens ⓘ</span>
-                  <span>$50</span>
+              </div>
+              <div className="h-6 w-px bg-cyber-border mx-2" />
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="bg-transparent border-none py-2 px-3 text-sm text-on-surface-variant outline-none focus:ring-0 cursor-pointer"
+              >
+                <option value="all">All Statuses</option>
+                <option value="pending">Pending</option>
+                <option value="ready_to_review">Ready</option>
+                <option value="completed">Completed</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Roster Table */}
+          <div className="glass-panel border-surface-border overflow-hidden rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
+            {loading ? (
+              <div className="divide-y divide-cyber-border/20">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="p-6 animate-pulse flex items-center gap-6">
+                    <div className="w-10 h-10 rounded-full bg-surface-elevated shrink-0" />
+                    <div className="space-y-2 flex-1">
+                      <div className="h-4 bg-surface-border rounded w-1/4" />
+                      <div className="h-3 bg-surface-border rounded w-1/3" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : leads.length === 0 ? (
+              <div className="p-20 text-center flex flex-col items-center">
+                <div className="w-16 h-16 rounded-2xl bg-strategic-violet/10 border border-strategic-violet/20 flex items-center justify-center mb-4">
+                  <Database className="text-strategic-violet" size={28} />
+                </div>
+                <h3 className="font-bold text-on-surface text-xl">Pipeline Empty</h3>
+                <p className="text-on-surface-variant text-sm mt-2 max-w-sm">No accounts match your current filters. Start a new hunt to discover prospects.</p>
+                <button className="mt-6 bg-surface-elevated border border-cyber-border px-6 py-2 rounded-lg text-sm font-medium hover:bg-surface-border transition-colors">
+                  Run New Hunt
+                </button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse whitespace-nowrap">
+                  <thead>
+                    <tr className="border-b border-cyber-border/50 bg-surface-container-lowest/50 text-[11px] font-mono text-on-surface-variant uppercase tracking-wider">
+                      <th className="py-4 px-6 font-medium">Company</th>
+                      <th className="py-4 px-6 font-medium">Tech & Score</th>
+                      <th className="py-4 px-6 font-medium">Contact</th>
+                      <th className="py-4 px-6 font-medium">Status</th>
+                      <th className="py-4 px-6 font-medium text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-cyber-border/30 text-sm">
+                    {leads.map((lead) => (
+                      <tr key={lead.id} className="hover:bg-surface-elevated/20 transition-colors group">
+                        <td className="py-5 px-6">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-xl bg-surface-elevated border border-cyber-border flex items-center justify-center shrink-0 text-on-surface font-bold">
+                              {lead.business_name.substring(0, 1)}
+                            </div>
+                            <div>
+                              <div className="font-semibold text-on-surface flex items-center gap-2">
+                                {lead.business_name}
+                              </div>
+                              <a href={lead.website_url} target="_blank" rel="noopener noreferrer" className="text-xs text-on-surface-variant hover:text-primary transition-colors flex items-center gap-1 mt-1">
+                                {lead.website_url.replace(/^https?:\/\//, '')} <ExternalLink size={10} />
+                              </a>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-5 px-6">
+                          <div className="flex flex-col gap-1.5">
+                            {lead.tech_stack?.platform ? (
+                              <span className="inline-flex items-center w-fit bg-surface-elevated border border-cyber-border px-2 py-0.5 rounded text-[10px] font-mono font-medium text-on-surface-variant">
+                                {lead.tech_stack.platform}
+                              </span>
+                            ) : (
+                              <span className="text-on-surface-variant/50 font-mono text-xs">—</span>
+                            )}
+                            <div className="flex items-center gap-1.5 text-xs">
+                              <span className={`font-mono font-bold ${lead.score >= 70 ? 'text-primary' : lead.score >= 45 ? 'text-warning' : 'text-on-surface-variant'}`}>
+                                {lead.score} / 100
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-5 px-6">
+                          <div className="flex gap-2">
+                            {lead.email ? (
+                              <div className="flex items-center gap-1.5 text-xs text-on-surface bg-surface-elevated px-2 py-1 rounded-md border border-cyber-border">
+                                <Mail size={12} className="text-on-surface-variant" /> {lead.email}
+                              </div>
+                            ) : (
+                              <span className="text-on-surface-variant/50 text-xs italic">No email</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-5 px-6">
+                          <div className="flex items-center gap-2">
+                            <span className={`w-2 h-2 rounded-full ${
+                              lead.status === 'ready_to_review' ? 'bg-primary' :
+                              lead.status === 'completed' ? 'bg-strategic-violet' :
+                              'bg-on-surface-variant/40'
+                            }`} />
+                            <span className="text-xs text-on-surface capitalize">
+                              {lead.status.replace(/_/g, ' ')}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-5 px-6 text-right">
+                          <button 
+                            onClick={() => openLeadDetails(lead)}
+                            className="text-xs font-medium bg-surface-elevated hover:bg-surface-border text-on-surface px-4 py-2 rounded-lg border border-cyber-border transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                          >
+                            Open Profile
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
+
+      {/* Slide-out Profile Drawer */}
+      {selected && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-obsidian-deep/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setSelected(null)} />
+          <aside className="relative glass-elevated w-full max-w-[600px] h-full flex flex-col animate-in slide-in-from-right duration-300 shadow-[-20px_0_40px_rgba(0,0,0,0.3)] border-l border-cyber-border">
+            
+            <div className="p-6 border-b border-cyber-border flex items-start justify-between bg-surface-elevated/20">
+              <div className="flex gap-4 items-center">
+                <div className="w-14 h-14 rounded-2xl bg-surface-elevated border border-cyber-border flex items-center justify-center text-xl font-bold text-on-surface shadow-inner">
+                  {selected.business_name.substring(0, 1)}
+                </div>
+                <div>
+                  <h2 className="font-bold text-on-surface text-xl">{selected.business_name}</h2>
+                  <a href={selected.website_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1 mt-0.5">
+                    {selected.website_url} <ExternalLink size={12} />
+                  </a>
+                </div>
+              </div>
+              <button onClick={() => setSelected(null)} className="p-2 rounded-full hover:bg-surface-elevated text-on-surface-variant transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-surface-container-lowest/30">
+              
+              {/* Action Ribbon */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => handleEnrich(selected.place_id)}
+                  disabled={enriching}
+                  className="flex-1 py-3 rounded-xl bg-surface-elevated border border-cyber-border hover:border-primary text-on-surface text-sm font-semibold transition-all flex items-center justify-center gap-2"
+                >
+                  {enriching ? <Loader2 size={16} className="animate-spin" /> : <Database size={16} />}
+                  Enrich Data
+                </button>
+                <button
+                  onClick={() => handleBrain(selected.place_id)}
+                  disabled={generatingBrain}
+                  className="flex-[2] py-3 rounded-xl bg-primary text-on-primary-fixed hover:brightness-110 text-sm font-bold transition-all shadow-[0_0_20px_rgba(var(--primary-rgb),0.2)] flex items-center justify-center gap-2"
+                >
+                  {generatingBrain ? <Loader2 size={16} className="animate-spin text-black" /> : <Sparkles size={16} className="text-black" />}
+                  Generate AI Outreach
+                </button>
+              </div>
+
+              {/* Intelligence Summary */}
+              <div>
+                <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-on-surface-variant mb-4 flex items-center gap-2">
+                  <Briefcase size={14} /> Intelligence Summary
+                </h3>
+                <div className="glass-panel p-5 border-surface-border grid grid-cols-2 gap-6">
+                  <div>
+                    <div className="text-[10px] uppercase font-mono text-on-surface-variant mb-1">Lead Score</div>
+                    <div className="text-2xl font-bold text-primary">{selected.score}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase font-mono text-on-surface-variant mb-1">Tech Stack</div>
+                    <div className="text-sm font-medium text-on-surface">{selected.tech_stack?.platform || 'Unknown'}</div>
+                  </div>
+                  <div className="col-span-2">
+                    <div className="text-[10px] uppercase font-mono text-on-surface-variant mb-2">Pain Points Discovered</div>
+                    <p className="text-sm text-on-surface-variant leading-relaxed">
+                      {selected.audit_pain_points || 'Run AI generation to uncover specific pain points from their digital presence.'}
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label htmlFor="pf-model" className="font-mono text-[10px] text-on-surface-variant uppercase tracking-wider block mb-2">Model Performance</label>
-                <select
-                  id="pf-model"
-                  value={preFlightModel}
-                  onChange={(e) => setPreFlightModel(e.target.value)}
-                  className="w-full bg-surface-container-low border border-cyber-border rounded-lg px-3 py-2 text-xs text-on-surface outline-none focus:border-primary/60 transition-colors font-mono"
-                >
-                  <option value="auto">Balanced &amp; Fast (Auto-Route)</option>
-                  <option value="pro">Deep Thinking (Gemini Pro)</option>
-                  <option value="flash">Ultra Speed (Gemini Flash)</option>
-                </select>
-              </div>
-
-              <div className="text-center bg-primary/10 border border-primary/20 text-primary p-3 rounded-lg flex items-center gap-2 mt-4 text-[10px] font-mono text-left leading-relaxed">
-                <Info size={14} className="shrink-0 text-primary" />
-                <span>
-                  Launching search for <strong>"{query}"</strong>. Budget cap parameters prevent infinite crawling.
-                </span>
-              </div>
-
-              <button
-                onClick={performSearch}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-primary text-on-primary-fixed font-mono text-xs font-bold uppercase tracking-wider hover:brightness-110 transition-all mt-4 cursor-pointer"
-              >
-                <Radar size={14} />
-                Launch Search Sequence
-              </button>
+              {/* AI Draft */}
+              {emailEdit && (
+                <div>
+                  <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-on-surface-variant mb-4 flex items-center gap-2">
+                    <MessageSquare size={14} /> AI Crafted Draft
+                  </h3>
+                  <div className="glass-panel border-primary/20 overflow-hidden relative group">
+                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={handleCopy} className="p-2 bg-surface-elevated border border-cyber-border rounded-lg text-on-surface hover:text-primary transition-colors flex items-center gap-2 text-xs font-medium">
+                        {copiedText ? <Check size={14} /> : <Copy size={14} />}
+                        {copiedText ? 'Copied' : 'Copy'}
+                      </button>
+                    </div>
+                    <div className="p-5">
+                      <div className="flex items-center gap-2 mb-4">
+                        <span className="px-2 py-1 bg-primary/10 text-primary text-[10px] font-mono font-bold rounded uppercase border border-primary/20">Hyper-Personalized</span>
+                      </div>
+                      <textarea
+                        value={emailEdit}
+                        onChange={(e) => setEmailEdit(e.target.value)}
+                        className="w-full bg-transparent border-none text-sm text-on-surface leading-relaxed outline-none resize-none min-h-[250px]"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
+          </aside>
         </div>
       )}
-
     </div>
   );
 }
