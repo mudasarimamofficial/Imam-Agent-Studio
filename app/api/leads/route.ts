@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/supabase/server';
-import { enrichWebsite } from '@/lib/hunt/enricher';
+import { processHuntLead } from '@/lib/hunt/enricher';
 import { generateLeadMessages } from '@/lib/hunt/brain';
 
 export async function GET(req: Request) {
@@ -109,18 +109,29 @@ export async function POST(req: Request) {
 
     if (action === 'enrich') {
       // Run enrichment sequence
-      const enriched = await enrichWebsite(leadRaw.website_uri, leadRaw.phone_number);
+      const secrets = {
+        gemini: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
+        nvidia: process.env.NVIDIA_API_KEY
+      };
+      const settings = { routing_weight_gemini: 0.8, routing_weight_nvidia: 0.2 };
+
+      const enriched = await processHuntLead(leadRaw.website_uri || leadRaw.website_url, settings, secrets);
+      
+      if (!enriched) {
+        return NextResponse.json({ success: false, error: { message: "Failed to enrich website" } }, { status: 400 });
+      }
+
       const updatePayload = {
-        email: enriched.email,
-        instagram_handle: enriched.instagram_handle,
-        has_email: enriched.has_email,
-        has_whatsapp: enriched.has_whatsapp,
-        has_instagram: enriched.has_instagram,
-        website_text_snippet: enriched.website_text_snippet,
-        discovery_error: enriched.discovery_error,
-        tech_stack: enriched.tech_stack,
-        audit_pain_points: enriched.audit_pain_points,
-        status: enriched.tech_stack ? 'processing' : 'failed',
+        email: enriched.emails[0] || null,
+        instagram_handle: enriched.socials.instagram ? new URL(enriched.socials.instagram).pathname.split('/')[1] : null,
+        has_email: enriched.emails.length > 0,
+        has_whatsapp: enriched.phones.length > 0,
+        has_instagram: !!enriched.socials.instagram,
+        website_text_snippet: JSON.stringify({ founders: enriched.founders, industry: enriched.industry, summary: enriched.summary, all_emails: enriched.emails, socials: enriched.socials }),
+        discovery_error: null,
+        tech_stack: enriched.techStack,
+        audit_pain_points: enriched.painPoints,
+        status: enriched.techStack ? 'processing' : 'failed',
         updated_at: new Date().toISOString()
       };
 
